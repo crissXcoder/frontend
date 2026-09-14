@@ -20,7 +20,7 @@ export default function LoginPage() {
 
       <Suspense
         fallback={
-          <div className="w-full max-w-md bg-card p-8 rounded-xl border border-border animate-pulse h-96" />
+          <div className="w-full max-w-md bg-card p-8 rounded-2xl border border-border animate-pulse h-96 shadow-2xl" />
         }
       >
         <LoginForm />
