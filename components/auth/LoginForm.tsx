@@ -37,14 +37,21 @@ export function LoginForm() {
         });
 
         if (error) {
-          if (error.message.includes('Invalid login credentials')) {
+          console.error('[LoginForm] Error retornado por Supabase Auth:', error);
+          const errorMsg = error.message?.toLowerCase() || '';
+          const errorCode = (error as { code?: string }).code;
+
+          if (
+            errorMsg.includes('invalid login credentials') ||
+            errorCode === 'invalid_credentials'
+          ) {
             setServerError('Correo o contraseña incorrectos.');
-          } else if (error.message.includes('Email not confirmed')) {
+          } else if (errorMsg.includes('email not confirmed')) {
             setServerError(
               'Tu correo aún no ha sido confirmado. Revisá tu bandeja de entrada.',
             );
           } else {
-            setServerError(error.message);
+            setServerError(error.message || 'Error al autenticar con el servidor.');
           }
           setIsLoading(false);
           return;
@@ -53,15 +60,27 @@ export function LoginForm() {
         // Refrescar el router para que el middleware reconozca la sesión en cookies
         router.push(redirectPath);
         router.refresh();
-      } catch {
-        setServerError('Ocurrió un error inesperado al iniciar sesión.');
+      } catch (err: unknown) {
+        console.error(
+          '[LoginForm] Excepción inesperada durante el inicio de sesión:',
+          err,
+        );
+        if (err instanceof Error) {
+          setServerError(
+            process.env.NODE_ENV === 'development'
+              ? `Error de inicialización o conexión: ${err.message}`
+              : 'Ocurrió un error inesperado al iniciar sesión.',
+          );
+        } else {
+          setServerError('Ocurrió un error inesperado al iniciar sesión.');
+        }
         setIsLoading(false);
       }
     },
   });
 
   return (
-    <div className="w-full max-w-md bg-card text-card-foreground border border-border rounded-xl shadow-sm p-6 sm:p-8">
+    <div className="w-full max-w-md bg-card text-card-foreground border border-border rounded-2xl shadow-2xl p-6 sm:p-8">
       <div className="mb-6 text-center">
         <h1 className="text-2xl font-bold tracking-tight text-foreground">
           Iniciar Sesión
