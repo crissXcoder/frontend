@@ -3,35 +3,45 @@ import { fetchApi } from './client';
 export interface Raza {
   id: string;
   nombre: string;
-  dias_gestacion: number;
+  dias_gestacion: number; // In DB it's dias_gestacion? Wait, catalogo_raza entity. Let's check it later.
 }
 
 export interface Animal {
   id: string;
   tenantId: string;
   nombre?: string;
-  arete_interno: string;
-  arete_senasa?: string;
+  areteInterno: string;
+  numeroOficialDiio?: string;
   sexo: string;
-  raza_id: string;
-  raza_otra?: string;
-  fecha_nacimiento?: string;
+  razaId: string;
+  razaOtra?: string;
+  fechaNacimiento?: string;
   categoria: string;
   activo: boolean;
-  madre_id?: string;
-  padre_id?: string;
-  foto_url?: string;
+  madreId?: string;
+  padreId?: string;
+  fotoUrl?: string;
   raza?: Raza;
+  
+  // Nuevos campos
+  origen?: 'Finca' | 'Externa';
+  compradoA?: string;
+  fechaCompra?: string;
+  valorCompraCrc?: number;
+  numeroGuia?: string;
+  metodoCompra?: 'Sinpe' | 'Depósito' | 'Efectivo' | 'Combinado';
+  metodosCombinados?: string[];
+  referenciaPago?: string;
 }
 
 export const getRazas = async (): Promise<Raza[]> => {
-  return fetchApi('/catalogos/razas');
+  return await fetchApi('/catalogos/razas');
 };
 
 export const getAnimales = async (filters: Record<string, string> = {}): Promise<Animal[]> => {
   const queryParams = new URLSearchParams(filters).toString();
   const url = queryParams ? `/animales?${queryParams}` : '/animales';
-  return fetchApi(url);
+  return await fetchApi(url);
 };
 
 export const getAnimal = async (id: string): Promise<Animal> => {
