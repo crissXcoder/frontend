@@ -48,23 +48,74 @@ export const getAnimal = async (id: string): Promise<Animal> => {
   return fetchApi(`/animales/${id}`);
 };
 
-export const createAnimal = async (animal: Partial<Animal>): Promise<Animal> => {
+export const createAnimal = async (animalData: any) => {
   return fetchApi('/animales', {
     method: 'POST',
-    body: JSON.stringify(animal),
+    body: JSON.stringify(animalData),
   });
 };
 
-export const updateAnimal = async (id: string, animal: Partial<Animal>): Promise<Animal> => {
+export const getDocumentos = async (animalId: string) => {
+  return fetchApi(`/animales/${animalId}/documentos`);
+};
+
+export const createDocumento = async (animalId: string, docData: { tipo: string, archivoUrl: string }) => {
+  return fetchApi(`/animales/${animalId}/documentos`, {
+    method: 'POST',
+    body: JSON.stringify(docData),
+  });
+};
+
+export const updateAnimal = async (id: string, animalData: any) => {
   return fetchApi(`/animales/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify(animal),
+    body: JSON.stringify(animalData),
   });
 };
 
-export const darDeBajaAnimal = async (id: string, bajaData: any): Promise<Animal> => {
+export const darDeBajaAnimal = async (id: string, data: any) => {
   return fetchApi(`/animales/${id}/baja`, {
     method: 'POST',
-    body: JSON.stringify(bajaData),
+    body: JSON.stringify(data),
   });
+};
+
+export const createPesaje = async (pesaje: any): Promise<any> => {
+  return fetchApi('/pesajes', {
+    method: 'POST',
+    body: JSON.stringify(pesaje),
+  });
+};
+
+export const getPesajesByAnimal = async (animalId: string): Promise<any[]> => {
+  return fetchApi(`/pesajes/animal/${animalId}`);
+};
+
+export const createServicio = async (servicio: any): Promise<any> => {
+  return fetchApi('/servicios', {
+    method: 'POST',
+    body: JSON.stringify(servicio),
+  });
+};
+
+export const getServiciosByAnimal = async (animalId: string): Promise<any[]> => {
+  return fetchApi(`/servicios/animal/${animalId}`);
+};
+
+export const updateServicio = async (id: string, data: any) => {
+  return fetchApi(`/servicios/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+};
+
+export const createTratamiento = async (tratamiento: any): Promise<any> => {
+  return fetchApi('/tratamientos', {
+    method: 'POST',
+    body: JSON.stringify(tratamiento),
+  });
+};
+
+export const getTratamientosByAnimal = async (animalId: string): Promise<any[]> => {
+  return fetchApi(`/tratamientos/animal/${animalId}`);
 };

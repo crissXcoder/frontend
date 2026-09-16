@@ -109,27 +109,37 @@ export default function ModalServicio({ isOpen, onClose, onSubmit }: ModalServic
             </div>
           </div>
 
-          <div className="bg-[#EEF4FF] border border-[#D5E4FF] rounded-xl p-4 mt-2">
-            <h3 className="text-xs font-bold text-navy uppercase tracking-wide mb-3">Hitos Calculados Automáticamente</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="bg-white rounded-lg p-2.5 text-center border border-white/60 shadow-sm">
-                <span className="block text-[10px] font-bold text-slate-400 uppercase">Palpación (Día 40)</span>
-                <span className="block text-sm font-bold text-orange-500 mt-1">01/10/2026</span>
-              </div>
-              <div className="bg-white rounded-lg p-2.5 text-center border border-white/60 shadow-sm">
-                <span className="block text-[10px] font-bold text-slate-400 uppercase">Secado (Mes 7)</span>
-                <span className="block text-sm font-bold text-purple-500 mt-1">20/03/2027</span>
-              </div>
-              <div className="bg-white rounded-lg p-2.5 text-center border border-white/60 shadow-sm">
-                <span className="block text-[10px] font-bold text-slate-400 uppercase">Aviso Parto (-15d)</span>
-                <span className="block text-sm font-bold text-red-500 mt-1">14/05/2027</span>
-              </div>
-              <div className="bg-white rounded-lg p-2.5 text-center border border-white/60 shadow-sm">
-                <span className="block text-[10px] font-bold text-slate-400 uppercase">FPP (Día 280)</span>
-                <span className="block text-sm font-bold text-green-500 mt-1">29/05/2027</span>
+          {formData.fecha && (
+            <div className="bg-[#EEF4FF] border border-[#D5E4FF] rounded-xl p-4 mt-2">
+              <h3 className="text-xs font-bold text-navy uppercase tracking-wide mb-3">Hitos Calculados Automáticamente</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-white rounded-lg p-2.5 text-center border border-white/60 shadow-sm">
+                  <span className="block text-[10px] font-bold text-slate-400 uppercase">Palpación (Día 40)</span>
+                  <span className="block text-sm font-bold text-orange-500 mt-1">
+                    {new Date(new Date(formData.fecha).getTime() + 40 * 24 * 60 * 60 * 1000).toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="bg-white rounded-lg p-2.5 text-center border border-white/60 shadow-sm">
+                  <span className="block text-[10px] font-bold text-slate-400 uppercase">Secado (Mes 7)</span>
+                  <span className="block text-sm font-bold text-purple-500 mt-1">
+                    {new Date(new Date(formData.fecha).getTime() + 210 * 24 * 60 * 60 * 1000).toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="bg-white rounded-lg p-2.5 text-center border border-white/60 shadow-sm">
+                  <span className="block text-[10px] font-bold text-slate-400 uppercase">Aviso Parto (-15d)</span>
+                  <span className="block text-sm font-bold text-red-500 mt-1">
+                    {new Date(new Date(formData.fecha).getTime() + 268 * 24 * 60 * 60 * 1000).toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="bg-white rounded-lg p-2.5 text-center border border-white/60 shadow-sm">
+                  <span className="block text-[10px] font-bold text-slate-400 uppercase">FPP (Día 283)</span>
+                  <span className="block text-sm font-bold text-green-500 mt-1">
+                    {new Date(new Date(formData.fecha).getTime() + 283 * 24 * 60 * 60 * 1000).toLocaleDateString()}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
             <button

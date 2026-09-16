@@ -1,25 +1,59 @@
 'use client';
 
-import { useState } from 'react';
-import { X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Loader2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { getAnimales } from '@/lib/api/animales';
 
 interface ModalEditarOrigenProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: any) => void;
-  animalName: string;
+  animal: any;
 }
 
-export default function ModalEditarOrigen({ isOpen, onClose, onSubmit, animalName }: ModalEditarOrigenProps) {
-  const [origen, setOrigen] = useState<'Finca' | 'Externa'>('Finca');
-  const [padre, setPadre] = useState('');
-  const [madre, setMadre] = useState('');
+export default function ModalEditarOrigen({ isOpen, onClose, onSubmit, animal }: ModalEditarOrigenProps) {
+  const [origen, setOrigen] = useState<'Finca' | 'Externa'>(animal?.origen || 'Finca');
+  const [padre, setPadre] = useState(animal?.padreId || '');
+  const [madre, setMadre] = useState(animal?.madreId || '');
+  
+  // Campos de compra
+  const [compradoA, setCompradoA] = useState(animal?.compradoA || '');
+  const [fechaCompra, setFechaCompra] = useState(animal?.fechaCompra || '');
+  const [valorCompraCrc, setValorCompraCrc] = useState(animal?.valorCompraCrc || '');
+  const [numeroGuia, setNumeroGuia] = useState(animal?.numeroGuia || '');
+
+  useEffect(() => {
+    if (isOpen && animal) {
+      setOrigen(animal.origen || 'Finca');
+      setPadre(animal.padreId || '');
+      setMadre(animal.madreId || '');
+      setCompradoA(animal.compradoA || '');
+      setFechaCompra(animal.fechaCompra ? animal.fechaCompra.split('T')[0] : '');
+      setValorCompraCrc(animal.valorCompraCrc || '');
+      setNumeroGuia(animal.numeroGuia || '');
+    }
+  }, [isOpen, animal]);
+
+  const { data: animales, isLoading } = useQuery({
+    queryKey: ['animales'],
+    queryFn: () => getAnimales({ activo: 'true' }),
+    enabled: isOpen,
+  });
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ origen, padre, madre });
+    onSubmit({ 
+      origen, 
+      padre, 
+      madre,
+      compradoA,
+      fechaCompra,
+      valorCompraCrc: valorCompraCrc ? parseFloat(valorCompraCrc) : null,
+      numeroGuia
+    });
     onClose();
   };
 
@@ -29,7 +63,7 @@ export default function ModalEditarOrigen({ isOpen, onClose, onSubmit, animalNam
         <div className="p-5 border-b border-slate-100 flex items-start justify-between">
           <div>
             <h2 className="text-lg font-bold text-navy">Editar Origen y Genealogía</h2>
-            <p className="text-sm text-slate-500 mt-1">Animal: <span className="font-semibold text-navy">{animalName}</span></p>
+            <p className="text-sm text-slate-500 mt-1">Animal: <span className="font-semibold text-navy">#{animal?.areteInterno} — {animal?.nombre}</span></p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
             <X className="w-5 h-5" />
@@ -70,10 +104,12 @@ export default function ModalEditarOrigen({ isOpen, onClose, onSubmit, animalNam
                     className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-light text-slate-700 bg-white"
                     value={padre}
                     onChange={e => setPadre(e.target.value)}
+                    disabled={isLoading}
                   >
                     <option value="">-- Seleccionar Toro Padre --</option>
-                    <option value="titan">Titan (CRC-B-001)</option>
-                    <option value="zeus">Zeus (CRC-B-002)</option>
+                    {animales?.filter(a => a.sexo === 'Macho').map(a => (
+                      <option key={a.id} value={a.id}>#{a.areteInterno} {a.nombre}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="space-y-1.5">
@@ -82,16 +118,56 @@ export default function ModalEditarOrigen({ isOpen, onClose, onSubmit, animalNam
                     className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-light text-slate-700 bg-white"
                     value={madre}
                     onChange={e => setMadre(e.target.value)}
+                    disabled={isLoading}
                   >
                     <option value="">-- Seleccionar Vaca Madre --</option>
-                    <option value="933">#933 Paloma</option>
-                    <option value="801">#801 Estrella</option>
+                    {animales?.filter(a => a.sexo === 'Hembra').map(a => (
+                      <option key={a.id} value={a.id}>#{a.areteInterno} {a.nombre}</option>
+                    ))}
                   </select>
                 </div>
               </>
             ) : (
-              <div className="py-4 text-center text-sm text-slate-500">
-                Los datos de compra y origen externo se configuran en la sección principal del expediente o registro.
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-semibold text-navy">Comprado a / Ganadería</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Subasta Ganadera Esparza"
+                    value={compradoA}
+                    onChange={(e) => setCompradoA(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-light text-slate-700 bg-white"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-semibold text-navy">Fecha de Compra</label>
+                  <input
+                    type="date"
+                    value={fechaCompra}
+                    onChange={(e) => setFechaCompra(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-light text-slate-700 bg-white"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-semibold text-navy">Valor de Compra (CRC ₡)</label>
+                  <input
+                    type="number"
+                    placeholder="Ej. 850000"
+                    value={valorCompraCrc}
+                    onChange={(e) => setValorCompraCrc(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-light text-slate-700 bg-white"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-semibold text-navy">Nº Comprobante / Guía</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. FAC-2024-001"
+                    value={numeroGuia}
+                    onChange={(e) => setNumeroGuia(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-light text-slate-700 bg-white"
+                  />
+                </div>
               </div>
             )}
           </div>

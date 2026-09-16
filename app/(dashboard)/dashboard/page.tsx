@@ -12,7 +12,7 @@ import { SemaforoSanitario } from "@/components/dashboard/semaforo-sanitario";
  */
 export default function DashboardPage() {
   return (
-    <div className="flex flex-1 flex-col gap-6 p-8 bg-[#F8FAFC] min-h-screen">
+    <div className="flex flex-1 flex-col gap-6 p-8">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           {/* H1 — DESIGN.md: text-3xl font-bold tracking-tight text-slate-900 */}

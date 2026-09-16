@@ -37,6 +37,8 @@ export default function NuevoAnimalPage() {
     metodoCompra: '',
     metodosCombinados: [] as string[],
     referenciaPago: '',
+    referenciaSinpe: '',
+    referenciaDeposito: '',
   });
 
   const { data: razas = [], isLoading: loadingRazas } = useQuery({
@@ -106,8 +108,21 @@ export default function NuevoAnimalPage() {
       setIsUploading(false);
     }
 
+    let refFinal = formData.referenciaPago;
+    if (formData.metodoCompra === 'Combinado') {
+      const refs = [];
+      if (formData.metodosCombinados.includes('Sinpe') && formData.referenciaSinpe) {
+        refs.push(`Sinpe: ${formData.referenciaSinpe}`);
+      }
+      if (formData.metodosCombinados.includes('Depósito') && formData.referenciaDeposito) {
+        refs.push(`Depósito: ${formData.referenciaDeposito}`);
+      }
+      if (refs.length > 0) refFinal = refs.join(' | ');
+    }
+
     createMutation.mutate({
       ...formData,
+      referenciaPago: refFinal,
       fotoUrl: uploadedFotoUrl,
       activo: true,
     });
@@ -473,19 +488,49 @@ export default function NuevoAnimalPage() {
                   </div>
                 )}
                 
-                {((formData.metodoCompra === 'Sinpe' || formData.metodoCompra === 'Depósito') || 
-                  (formData.metodoCompra === 'Combinado' && (formData.metodosCombinados.includes('Sinpe') || formData.metodosCombinados.includes('Depósito')))) && (
-                  <div className="space-y-1.5">
-                    <label className="block text-sm font-semibold text-navy">N° Referencia / Comprobante de Pago</label>
-                    <input
-                      type="text"
-                      name="referenciaPago"
-                      value={formData.referenciaPago || ''}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 border border-amber-200/60 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-light bg-white/50"
-                      placeholder="Ej. 12345678"
-                    />
-                  </div>
+                {formData.metodoCompra === 'Combinado' ? (
+                  <>
+                    {formData.metodosCombinados.includes('Sinpe') && (
+                      <div className="space-y-1.5">
+                        <label className="block text-sm font-semibold text-navy">N° Referencia Sinpe</label>
+                        <input
+                          type="text"
+                          name="referenciaSinpe"
+                          value={formData.referenciaSinpe || ''}
+                          onChange={handleChange}
+                          className="w-full px-3 py-2 border border-amber-200/60 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-light bg-white/50"
+                          placeholder="Ej. 12345678"
+                        />
+                      </div>
+                    )}
+                    {formData.metodosCombinados.includes('Depósito') && (
+                      <div className="space-y-1.5">
+                        <label className="block text-sm font-semibold text-navy">N° Referencia Depósito</label>
+                        <input
+                          type="text"
+                          name="referenciaDeposito"
+                          value={formData.referenciaDeposito || ''}
+                          onChange={handleChange}
+                          className="w-full px-3 py-2 border border-amber-200/60 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-light bg-white/50"
+                          placeholder="Ej. 12345678"
+                        />
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  (formData.metodoCompra === 'Sinpe' || formData.metodoCompra === 'Depósito') && (
+                    <div className="space-y-1.5">
+                      <label className="block text-sm font-semibold text-navy">N° Referencia {formData.metodoCompra}</label>
+                      <input
+                        type="text"
+                        name="referenciaPago"
+                        value={formData.referenciaPago || ''}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-amber-200/60 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-light bg-white/50"
+                        placeholder="Ej. 12345678"
+                      />
+                    </div>
+                  )
                 )}
               </div>
             )}

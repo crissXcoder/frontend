@@ -2,10 +2,13 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { getAnimal } from '@/lib/api/animales';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getAnimal, createPesaje, createServicio, createTratamiento, getPesajesByAnimal, getServiciosByAnimal, getTratamientosByAnimal, updateServicio, updateAnimal, getDocumentos, createDocumento } from '@/lib/api/animales';
+import { createClient } from '@/lib/supabase/client';
 import { 
   ChevronLeft, 
   Plus, 
@@ -22,6 +25,17 @@ import ModalPesaje from '@/components/modals/ModalPesaje';
 import ModalServicio from '@/components/modals/ModalServicio';
 import ModalTratamiento from '@/components/modals/ModalTratamiento';
 import ModalEditarOrigen from '@/components/modals/ModalEditarOrigen';
+import ModalDocumento from '@/components/modals/ModalDocumento';
+import { ModalEditarAnimal } from '@/components/modals/ModalEditarAnimal';
+import { 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer 
+} from 'recharts';
 
 export default function ExpedienteAnimal() {
   const params = useParams();
@@ -34,11 +48,251 @@ export default function ExpedienteAnimal() {
   const [isServicioOpen, setIsServicioOpen] = useState(false);
   const [isTratamientoOpen, setIsTratamientoOpen] = useState(false);
   const [isOrigenOpen, setIsOrigenOpen] = useState(false);
+  const [isDocumentoOpen, setIsDocumentoOpen] = useState(false);
+  const [isEditarAnimalOpen, setIsEditarAnimalOpen] = useState(false);
+  
+  // Documentos state
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+  const supabase = createClient();
+
+  const queryClient = useQueryClient();
 
   const { data: animal, isLoading, isError } = useQuery({
     queryKey: ['animal', animalId],
     queryFn: () => getAnimal(animalId),
   });
+
+  const { data: pesajes } = useQuery({
+    queryKey: ['pesajes', animalId],
+    queryFn: () => getPesajesByAnimal(animalId),
+  });
+
+  const { data: servicios } = useQuery({
+    queryKey: ['servicios', animalId],
+    queryFn: () => getServiciosByAnimal(animalId),
+  });
+
+  const { data: tratamientos } = useQuery({
+    queryKey: ['tratamientos', animalId],
+    queryFn: () => getTratamientosByAnimal(animalId),
+  });
+
+  const { data: documentosDocumentos } = useQuery({
+    queryKey: ['documentos', animalId],
+    queryFn: () => getDocumentos(animalId),
+  });
+
+  const pesajeMutation = useMutation({
+    mutationFn: (data: any) => createPesaje({ 
+      ...data, 
+      pesoActualKg: data.peso_actual ? parseFloat(data.peso_actual) : null,
+      lecheMananaL: data.leche_manana ? parseFloat(data.leche_manana) : null,
+      lecheTardeL: data.leche_tarde ? parseFloat(data.leche_tarde) : null,
+      animalId 
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pesajes', animalId] });
+      setIsPesajeOpen(false);
+    }
+  });
+
+  const servicioMutation = useMutation({
+    mutationFn: (data: any) => createServicio({ 
+      ...data,
+      tipoServicio: data.tipo_servicio,
+      animalId 
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['servicios', animalId] });
+      setIsServicioOpen(false);
+    }
+  });
+
+  const updateServicioMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string, data: any }) => updateServicio(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['servicios', animalId] });
+    }
+  });
+
+  const tratamientoMutation = useMutation({
+    mutationFn: (data: any) => createTratamiento({ 
+      ...data,
+      diasRetiro: data.dias_retiro ? parseInt(data.dias_retiro) : 0,
+      animalId 
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tratamientos', animalId] });
+      setIsTratamientoOpen(false);
+    }
+  });
+
+  const updateAnimalMutation = useMutation({
+    mutationFn: (data: any) => updateAnimal(animalId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['animal', animalId] });
+      setIsOrigenOpen(false);
+    }
+  });
+
+  const documentoMutation = useMutation({
+    mutationFn: (data: { tipo: string, archivoUrl: string }) => createDocumento(animalId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documentos', animalId] });
+    }
+  });
+
+  const handleDocumentSubmit = async ({ tipo, file }: { tipo: string; file: File }) => {
+    try {
+      setIsUploadingDoc(true);
+
+      // Subir archivo a Supabase Storage
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${animalId}-${tipo.replace(/[^a-z0-9]/gi, '_').toLowerCase()}-${Date.now()}.${fileExt}`;
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('animal_docs')
+        .upload(fileName, file);
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      // Obtener URL pública
+      const { data: { publicUrl } } = supabase.storage
+        .from('animal_docs')
+        .getPublicUrl(fileName);
+
+      // Guardar en la base de datos
+      await documentoMutation.mutateAsync({
+        tipo,
+        archivoUrl: publicUrl
+      });
+      
+      setIsDocumentoOpen(false);
+
+    } catch (error) {
+      console.error('Error al subir documento:', error);
+      alert('Hubo un error al subir el documento. Por favor, intente de nuevo.');
+    } finally {
+      setIsUploadingDoc(false);
+    }
+  };
+
+  const handleDownloadPDF = () => {
+    if (!animal) return;
+
+    const doc = new jsPDF();
+    let yPos = 20;
+
+    // Título
+    doc.setFontSize(18);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`Expediente Animal: #${animal.areteInterno} ${animal.nombre || ''}`, 14, yPos);
+    yPos += 10;
+
+    // Info General
+    doc.setFontSize(12);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Raza: ${animal.raza?.nombre || 'N/A'}`, 14, yPos);
+    doc.text(`Categoría: ${animal.categoria || 'N/A'}`, 80, yPos);
+    doc.text(`Sexo: ${animal.sexo || 'N/A'}`, 150, yPos);
+    yPos += 8;
+    
+    doc.text(`Peso Actual: ${animal.pesoActualKg || 0} kg`, 14, yPos);
+    doc.text(`Potrero: ${animal.potrero || 'N/A'}`, 80, yPos);
+    if (animal.fechaNacimiento) {
+      doc.text(`Fecha Nac.: ${new Date(animal.fechaNacimiento).toLocaleDateString()}`, 150, yPos);
+    }
+    yPos += 15;
+
+    // Sección: Pesajes y Leche
+    if (pesajes && pesajes.length > 0) {
+      doc.setFontSize(14);
+      doc.setTextColor(15, 23, 42);
+      doc.text('Historial de Producción y Pesajes', 14, yPos);
+      yPos += 5;
+      
+      const tableData = pesajes.map((p: any) => {
+        const totalL = (Number(p.lecheMananaL) || 0) + (Number(p.lecheTardeL) || 0);
+        return [
+          new Date(p.fecha).toLocaleDateString(),
+          p.pesoActualKg ? `${p.pesoActualKg} kg` : '-',
+          totalL > 0 ? `${totalL.toFixed(1)} L` : '-'
+        ];
+      });
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Fecha', 'Peso (kg)', 'Leche Total (L)']],
+        body: tableData,
+        theme: 'striped',
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [15, 23, 42] }
+      });
+      yPos = (doc as any).lastAutoTable.finalY + 15;
+    }
+
+    // Sección: Sanitario
+    if (tratamientos && tratamientos.length > 0) {
+      if (yPos > 250) { doc.addPage(); yPos = 20; }
+      
+      doc.setFontSize(14);
+      doc.setTextColor(15, 23, 42);
+      doc.text('Historial Sanitario', 14, yPos);
+      yPos += 5;
+      
+      const tableData = tratamientos.map((t: any) => [
+        t.fecha ? new Date(t.fecha).toLocaleDateString() : '-',
+        t.diagnostico || '-',
+        t.farmaco || '-',
+        t.dosis || '-',
+        t.veterinario || '-'
+      ]);
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Fecha', 'Enfermedad', 'Medicamento', 'Dosis', 'Responsable']],
+        body: tableData,
+        theme: 'striped',
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [15, 23, 42] }
+      });
+      yPos = (doc as any).lastAutoTable.finalY + 15;
+    }
+
+    // Sección: Reproductivo
+    if (servicios && servicios.length > 0) {
+      if (yPos > 250) { doc.addPage(); yPos = 20; }
+      
+      doc.setFontSize(14);
+      doc.setTextColor(15, 23, 42);
+      doc.text('Historial Reproductivo', 14, yPos);
+      yPos += 5;
+      
+      const tableData = servicios.map((s: any) => {
+        return [
+          s.fecha ? new Date(s.fecha).toLocaleDateString() : '-',
+          s.tipoServicio || '-',
+          s.semental || '-',
+          s.estadoPalpacion || 'Pendiente'
+        ];
+      });
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Fecha', 'Tipo', 'Toro/Semen', 'Estado']],
+        body: tableData,
+        theme: 'striped',
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [15, 23, 42] }
+      });
+      yPos = (doc as any).lastAutoTable.finalY + 15;
+    }
+
+    // Descargar
+    doc.save(`Expediente_${animal.areteInterno}_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
 
   const tabs = [
     { id: 'resumen', label: 'Resumen General' },
@@ -76,7 +330,10 @@ export default function ExpedienteAnimal() {
             Volver al Hato
           </Link>
           <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 bg-white transition-colors">
+            <button 
+              onClick={() => setIsEditarAnimalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 bg-white transition-colors"
+            >
               <Pencil className="w-4 h-4" />
               Editar Animal
             </button>
@@ -149,7 +406,10 @@ export default function ExpedienteAnimal() {
               >
                 Aplicar Tratamiento
               </button>
-              <button className="w-full sm:w-auto px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-bold shadow-sm hover:bg-slate-50 transition-colors">
+              <button 
+                onClick={handleDownloadPDF}
+                className="w-full sm:w-auto px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-bold shadow-sm hover:bg-slate-50 transition-colors"
+              >
                 Descargar PDF
               </button>
             </div>
@@ -249,7 +509,7 @@ export default function ExpedienteAnimal() {
                     {/* Padre */}
                     <div className="bg-white border border-slate-200 rounded-xl p-4 w-[45%] shadow-sm hover:border-slate-300 transition-colors">
                       <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Padre (Semental / Pajilla)</div>
-                      <div className="font-bold text-navy text-base">{animal.padreId ? `Semental #${animal.padreId}` : 'No registrado'}</div>
+                      <div className="font-bold text-navy text-base">{animal.padre ? `Semental #${animal.padre.areteInterno} ${animal.padre.nombre || ''}` : 'No registrado'}</div>
                       <div className="flex items-center gap-2 mt-2 text-xs font-semibold">
                       </div>
                     </div>
@@ -257,7 +517,7 @@ export default function ExpedienteAnimal() {
                     {/* Madre */}
                     <div className="bg-green-50/30 border border-green-200 rounded-xl p-4 w-[45%] shadow-sm hover:border-green-300 transition-colors">
                       <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide mb-1">Madre (Vaca Matriz / Dam)</div>
-                      <div className="font-bold text-navy text-base">{animal.madreId ? `Matriz #${animal.madreId}` : 'No registrada'}</div>
+                      <div className="font-bold text-navy text-base">{animal.madre ? `Matriz #${animal.madre.areteInterno} ${animal.madre.nombre || ''}` : 'No registrada'}</div>
                       <div className="flex items-center gap-2 mt-2 text-xs font-semibold">
                       </div>
                     </div>
@@ -386,16 +646,32 @@ export default function ExpedienteAnimal() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm text-slate-600">
-                    <tr className="hover:bg-slate-50 transition-colors">
-                      <td className="p-4 pl-6 sm:pl-8">19/08/2026</td>
-                      <td className="p-4 font-bold text-navy">Cefalexina 200 Intramamaria</td>
-                      <td className="p-4">Mastitis subclínica cuarto posterior izquierdo</td>
-                      <td className="p-4">20 ml</td>
-                      <td className="p-4">Intramamaria</td>
-                      <td className="p-4 text-sky-600">Dr. Carlos Alvarado</td>
-                      <td className="p-4 font-bold text-red-600">5d</td>
-                      <td className="p-4 pr-6 sm:pr-8">24/08/2026</td>
-                    </tr>
+                    {tratamientos?.map((t: any) => (
+                      <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="p-4 pl-6 sm:pl-8">{new Date(t.fecha).toLocaleDateString()}</td>
+                        <td className="p-4 font-bold text-navy">{t.farmaco}</td>
+                        <td className="p-4">{t.diagnostico}</td>
+                        <td className="p-4">{t.dosis}</td>
+                        <td className="p-4">{t.via}</td>
+                        <td className="p-4 text-sky-600">{t.medico}</td>
+                        <td className="p-4 font-bold text-red-600">{t.diasRetiro}d</td>
+                        <td className="p-4 pr-6 sm:pr-8">
+                          {(() => {
+                            if (!t.diasRetiro) return '-';
+                            const date = new Date(t.fecha);
+                            date.setDate(date.getDate() + t.diasRetiro);
+                            return date.toLocaleDateString();
+                          })()}
+                        </td>
+                      </tr>
+                    ))}
+                    {(!tratamientos || tratamientos.length === 0) && (
+                      <tr>
+                        <td colSpan={8} className="p-8 text-center text-slate-400">
+                          No hay tratamientos registrados
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -429,21 +705,60 @@ export default function ExpedienteAnimal() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm text-slate-600">
-                    <tr className="hover:bg-slate-50 transition-colors">
-                      <td className="p-4 pl-6 sm:pl-8">15/01/2026</td>
-                      <td className="p-4">
-                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">Inseminación Artificial</span>
-                      </td>
-                      <td className="p-4">Titan (CRC-B-001)</td>
-                      <td className="p-4 text-sky-600">Dr. Carlos Alvarado</td>
-                      <td className="p-4">Potrero #4</td>
-                      <td className="p-4 font-bold text-green-600">15/10/2026</td>
-                      <td className="p-4 font-bold text-orange-500">24/02/2026</td>
-                      <td className="p-4">
-                        <span className="px-3 py-1 bg-blue-50 border border-blue-100 text-blue-600 rounded-full text-[10px] font-bold uppercase tracking-wide">Gestante Confirmada</span>
-                      </td>
-                      <td className="p-4 pr-6 sm:pr-8 text-slate-400 truncate max-w-[150px]">Inseminación exit...</td>
-                    </tr>
+                    {servicios?.map((s: any) => {
+                      const fechaServicio = new Date(s.fecha);
+                      const fpp = new Date(fechaServicio);
+                      fpp.setDate(fpp.getDate() + 283);
+                      
+                      const palpacion = new Date(fechaServicio);
+                      palpacion.setDate(palpacion.getDate() + 40);
+
+                      return (
+                        <tr key={s.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="p-4 pl-6 sm:pl-8">{fechaServicio.toLocaleDateString()}</td>
+                          <td className="p-4">
+                            <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">{s.tipoServicio}</span>
+                          </td>
+                          <td className="p-4">{s.semental || '-'}</td>
+                          <td className="p-4 text-sky-600">{s.inseminador || '-'}</td>
+                          <td className="p-4">{s.potrero || '-'}</td>
+                          <td className="p-4 font-bold text-green-600">{fpp.toLocaleDateString()}</td>
+                          <td className="p-4 font-bold text-orange-500">
+                            {s.fechaPalpacion ? new Date(new Date(s.fechaPalpacion).getTime() + new Date().getTimezoneOffset() * 60000).toLocaleDateString() : palpacion.toLocaleDateString()}
+                          </td>
+                          <td className="p-4">
+                            <select
+                              className={`px-2 py-1 border rounded-lg text-[10px] font-bold uppercase tracking-wide cursor-pointer focus:outline-none focus:ring-2 focus:ring-navy-light ${
+                                !s.estadoPalpacion || s.estadoPalpacion === 'Por Confirmar' ? 'bg-slate-50 border-slate-200 text-slate-500' :
+                                s.estadoPalpacion === 'Gestante' ? 'bg-green-50 border-green-200 text-green-600' :
+                                'bg-red-50 border-red-200 text-red-600'
+                              }`}
+                              value={s.estadoPalpacion || 'Por Confirmar'}
+                              onChange={(e) => updateServicioMutation.mutate({ 
+                                id: s.id, 
+                                data: { 
+                                  estadoPalpacion: e.target.value,
+                                  fechaPalpacion: e.target.value !== 'Por Confirmar' ? new Date().toISOString().split('T')[0] : null
+                                } 
+                              })}
+                              disabled={updateServicioMutation.isPending}
+                            >
+                              <option value="Por Confirmar">Por Confirmar</option>
+                              <option value="Gestante">Gestante (+)</option>
+                              <option value="Vacía">Vacía (-)</option>
+                            </select>
+                          </td>
+                          <td className="p-4 pr-6 sm:pr-8 text-slate-400 truncate max-w-[150px]">{s.observaciones || '-'}</td>
+                        </tr>
+                      );
+                    })}
+                    {(!servicios || servicios.length === 0) && (
+                      <tr>
+                        <td colSpan={9} className="p-8 text-center text-slate-400">
+                          No hay servicios registrados
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -455,23 +770,39 @@ export default function ExpedienteAnimal() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
                   <h3 className="text-sm font-bold text-navy mb-4">Curva de Lactancia (L/día)</h3>
-                  <div className="h-48 w-full border-b-2 border-l-2 border-slate-100 relative">
-                    <div className="absolute inset-0 flex items-center justify-center text-slate-300 text-xs">Gráfico interactivo simulado</div>
-                    {/* Mock lines */}
-                    <div className="absolute top-[20%] left-0 right-0 border-t border-slate-200 border-dashed"></div>
-                    <div className="absolute top-[50%] left-0 right-0 border-t border-slate-200 border-dashed"></div>
-                    <div className="absolute top-[80%] left-0 right-0 border-t border-slate-200 border-dashed"></div>
+                  <div className="h-48 w-full">
+                    {pesajes && pesajes.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={[...pesajes].reverse()} margin={{ top: 5, right: 5, bottom: 5, left: -20 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                          <XAxis dataKey="fecha" tickFormatter={(val) => new Date(val).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })} tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                          <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                          <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} labelFormatter={(val) => new Date(val).toLocaleDateString()} />
+                          <Line type="monotone" dataKey={(p) => (Number(p.lecheMananaL) || 0) + (Number(p.lecheTardeL) || 0)} stroke="#0284c7" strokeWidth={3} dot={{ r: 4, fill: '#0284c7', strokeWidth: 0 }} activeDot={{ r: 6, fill: '#0284c7' }} name="Total Leche (L)" />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-slate-300 text-xs">Sin datos de lactancia</div>
+                    )}
                   </div>
                 </div>
                 
                 <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
                   <h3 className="text-sm font-bold text-navy mb-4">Evolución de Peso (kg)</h3>
-                  <div className="h-48 w-full border-b-2 border-l-2 border-slate-100 relative">
-                    <div className="absolute inset-0 flex items-center justify-center text-slate-300 text-xs">Gráfico interactivo simulado</div>
-                    {/* Mock lines */}
-                    <div className="absolute top-[20%] left-0 right-0 border-t border-slate-200 border-dashed"></div>
-                    <div className="absolute top-[50%] left-0 right-0 border-t border-slate-200 border-dashed"></div>
-                    <div className="absolute top-[80%] left-0 right-0 border-t border-slate-200 border-dashed"></div>
+                  <div className="h-48 w-full">
+                    {pesajes && pesajes.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={[...pesajes].reverse()} margin={{ top: 5, right: 5, bottom: 5, left: -20 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                          <XAxis dataKey="fecha" tickFormatter={(val) => new Date(val).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })} tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                          <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} domain={['dataMin - 10', 'auto']} />
+                          <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} labelFormatter={(val) => new Date(val).toLocaleDateString()} />
+                          <Line type="monotone" dataKey={(p) => Number(p.pesoActualKg) || 0} stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 6, fill: '#10b981' }} name="Peso (kg)" />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-slate-300 text-xs">Sin datos de peso</div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -488,21 +819,30 @@ export default function ExpedienteAnimal() {
                 </div>
                 <div className="p-6">
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                      <span className="text-sm text-slate-500 w-1/3">20/08/2026</span>
-                      <span className="text-sm font-bold text-navy w-1/3">485 kg</span>
-                      <span className="text-sm font-bold text-green-600 w-1/3 text-right">18.5 L</span>
-                    </div>
-                    <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                      <span className="text-sm text-slate-500 w-1/3">10/08/2026</span>
-                      <span className="text-sm font-bold text-navy w-1/3">480 kg</span>
-                      <span className="text-sm font-bold text-green-600 w-1/3 text-right">18.5 L</span>
-                    </div>
-                    <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                      <span className="text-sm text-slate-500 w-1/3">30/07/2026</span>
-                      <span className="text-sm font-bold text-navy w-1/3">478 kg</span>
-                      <span className="text-sm font-bold text-green-600 w-1/3 text-right">19.0 L</span>
-                    </div>
+                    {pesajes && pesajes.length > 0 && (
+                      <div className="flex items-center justify-between pb-2 mb-2 border-b-2 border-slate-100">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider w-1/3">Fecha</span>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider w-1/3">Peso (kg)</span>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider w-1/3 text-right">Leche Total (L)</span>
+                      </div>
+                    )}
+                    {pesajes?.map((p: any) => {
+                      const totalLeche = (Number(p.lecheMananaL) || 0) + (Number(p.lecheTardeL) || 0);
+                      return (
+                        <div key={p.id} className="flex items-center justify-between py-2 border-b border-slate-100">
+                          <span className="text-sm text-slate-500 w-1/3">{new Date(p.fecha).toLocaleDateString()}</span>
+                          <span className="text-sm font-bold text-navy w-1/3">{p.pesoActualKg ? `${p.pesoActualKg} kg` : '-'}</span>
+                          <span className="text-sm font-bold text-green-600 w-1/3 text-right">
+                            {totalLeche > 0 ? `${totalLeche.toFixed(1)} L` : '-'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {(!pesajes || pesajes.length === 0) && (
+                      <div className="py-8 text-center text-slate-400 text-sm">
+                        No hay pesajes registrados
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -510,53 +850,100 @@ export default function ExpedienteAnimal() {
           )}
 
           {activeTab === 'documentos' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mt-6">
-              {[
-                { name: "Certificado de Pedigrí", status: "No cargado" },
-                { name: "Permiso Sanitario", status: "No cargado" },
-                { name: "Guía de Movilización", status: "No cargado" },
-                { name: "Vacuna Aftosa", status: "No cargado" },
-                { name: "Prueba de Brucelosis", status: "No cargado" }
-              ].map((doc, idx) => (
-                <div key={idx} className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between h-40">
-                  <div>
-                    <div className="w-8 h-8 rounded bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 mb-3">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
-                    </div>
-                    <h4 className="font-bold text-navy text-sm">{doc.name}</h4>
-                    <p className="text-xs text-slate-400 mt-0.5">{doc.status}</p>
+            <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden mt-6">
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="text-lg font-bold text-navy">Documentos del Animal</h3>
+                <button 
+                  onClick={() => setIsDocumentoOpen(true)}
+                  className="px-4 py-2 bg-navy text-white rounded-lg text-sm font-bold shadow-sm hover:bg-navy-light transition-colors flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Agregar Documento
+                </button>
+              </div>
+              <div className="p-6">
+                {!documentosDocumentos || documentosDocumentos.length === 0 ? (
+                  <div className="py-8 flex flex-col items-center justify-center text-slate-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12 mb-3 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    <p className="text-sm">No hay documentos registrados</p>
                   </div>
-                  <button className="w-full py-2 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors mt-4">
-                    Cargar Documento
-                  </button>
-                </div>
-              ))}
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    {documentosDocumentos.map((doc: any) => (
+                      <div key={doc.id} className="border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col h-full hover:shadow-md transition-shadow">
+                        <div className="flex-1">
+                          <div className="w-10 h-10 rounded-lg bg-navy/5 border border-navy/10 flex items-center justify-center text-navy mb-4">
+                            <CheckCircle2 className="w-5 h-5" />
+                          </div>
+                          <h4 className="font-bold text-navy text-sm mb-1">{doc.tipo}</h4>
+                          <p className="text-xs text-slate-400">
+                            Cargado el {new Date(doc.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="mt-5 pt-4 border-t border-slate-100">
+                          <a 
+                            href={doc.archivoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full flex items-center justify-center gap-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 hover:border-slate-300 transition-all"
+                          >
+                            <Download className="w-3 h-3" />
+                            Ver / Descargar
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
       </div>
 
       {/* Modals */}
+      <ModalEditarAnimal 
+        isOpen={isEditarAnimalOpen}
+        onClose={() => setIsEditarAnimalOpen(false)}
+        animal={animal}
+      />
+
       <ModalPesaje 
         isOpen={isPesajeOpen} 
         onClose={() => setIsPesajeOpen(false)} 
-        onSubmit={(data) => console.log('Pesaje guardado', data)} 
+        onSubmit={(data) => pesajeMutation.mutate(data)} 
       />
       <ModalServicio 
         isOpen={isServicioOpen} 
         onClose={() => setIsServicioOpen(false)} 
-        onSubmit={(data) => console.log('Servicio guardado', data)} 
+        onSubmit={(data) => servicioMutation.mutate(data)} 
       />
       <ModalTratamiento 
         isOpen={isTratamientoOpen} 
         onClose={() => setIsTratamientoOpen(false)} 
-        onSubmit={(data) => console.log('Tratamiento guardado', data)} 
+        onSubmit={(data) => tratamientoMutation.mutate(data)} 
       />
       <ModalEditarOrigen 
         isOpen={isOrigenOpen} 
         onClose={() => setIsOrigenOpen(false)}
-        animalName={`#${animal.areteInterno} — ${animal.nombre}`}
-        onSubmit={(data) => console.log('Origen guardado', data)} 
+        animal={animal}
+        onSubmit={(data) => {
+          updateAnimalMutation.mutate({
+            origen: data.origen,
+            padreId: data.padre || null,
+            madreId: data.madre || null,
+            compradoA: data.compradoA || null,
+            fechaCompra: data.fechaCompra || null,
+            valorCompraCrc: data.valorCompraCrc || null,
+            numeroGuia: data.numeroGuia || null,
+          });
+        }} 
+      />
+      <ModalDocumento
+        isOpen={isDocumentoOpen}
+        onClose={() => setIsDocumentoOpen(false)}
+        onSubmit={handleDocumentSubmit}
+        isUploading={isUploadingDoc}
       />
 
     </div>

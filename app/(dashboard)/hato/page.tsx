@@ -4,24 +4,47 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getAnimales } from '@/lib/api/animales';
 import { StatusBadge } from '@/components/StatusBadge';
-import { Search, Plus, MoreVertical } from 'lucide-react';
+import { Search, Plus, MoreVertical, Edit2, ArchiveX } from 'lucide-react';
 import Link from 'next/link';
+import { ModalEditarAnimal } from '@/components/modals/ModalEditarAnimal';
+import { ModalDarBaja } from '@/components/modals/ModalDarBaja';
 
 export default function HatoPage() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterRaza, setFilterRaza] = useState('');
+  const [filterSanitario, setFilterSanitario] = useState('');
+  const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
+  const [editingAnimal, setEditingAnimal] = useState<any | null>(null);
+  const [bajaAnimal, setBajaAnimal] = useState<any | null>(null);
   
   const { data: animales = [], isLoading, error } = useQuery({
     queryKey: ['animales'],
     queryFn: () => getAnimales(),
   });
 
-  const filteredAnimales = animales.filter(animal => 
-    animal.areteInterno.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (animal.nombre && animal.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // Cerrar dropdown al hacer click fuera (simple hack with an overlay)
+  const closeDropdown = () => setActiveDropdownId(null);
+
+  const filteredAnimales = animales.filter(animal => {
+    // Filter by search term
+    const matchesSearch = 
+      animal.areteInterno.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (animal.nombre && animal.nombre.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    // Filter by raza
+    const razaName = animal.razaOtra ? animal.razaOtra : animal.raza?.nombre;
+    const matchesRaza = filterRaza === '' || (razaName && razaName.toLowerCase().includes(filterRaza.toLowerCase()));
+
+    // Filter by status (sanitario/activo)
+    // In the UI we map animal.activo ? 'Apto' : (animal.tipoBaja || 'Inactivo')
+    const statusLabel = animal.activo ? 'Apto' : (animal.tipoBaja || 'Inactivo');
+    const matchesSanitario = filterSanitario === '' || statusLabel.toLowerCase() === filterSanitario.toLowerCase();
+
+    return matchesSearch && matchesRaza && matchesSanitario;
+  });
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6 md:p-8">
+    <main className="p-6 md:p-8">
       <div className="max-w-[1400px] mx-auto space-y-6">
         
         {/* Top Actions (simulating top bar) */}
@@ -49,26 +72,34 @@ export default function HatoPage() {
             />
           </div>
           <div className="flex gap-3">
-            <select className="px-4 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-navy-light min-w-[160px]">
+            <select 
+              value={filterRaza}
+              onChange={(e) => setFilterRaza(e.target.value)}
+              className="px-4 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-navy-light min-w-[160px]"
+            >
               <option value="">Todas las razas</option>
               <option value="girolando">Girolando</option>
               <option value="brahman">Brahman</option>
               <option value="nelore">Nelore</option>
               <option value="holstein">Holstein</option>
             </select>
-            <select className="px-4 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-navy-light min-w-[160px]">
+            <select 
+              value={filterSanitario}
+              onChange={(e) => setFilterSanitario(e.target.value)}
+              className="px-4 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-navy-light min-w-[160px]"
+            >
               <option value="">Todo estado sanitario</option>
               <option value="Apto">Apto</option>
-              <option value="Retiro Leche">Retiro Leche</option>
-              <option value="Retiro Carne">Retiro Carne</option>
-              <option value="En Revision">En Revisión</option>
+              <option value="Inactivo">Inactivo</option>
+              <option value="Fallecimiento">Fallecimiento</option>
+              <option value="Venta Comercial">Venta Comercial</option>
             </select>
           </div>
         </div>
 
         {/* Table Section */}
         <section className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className={`overflow-x-auto ${activeDropdownId ? 'pb-24' : ''}`}>
             <table className="w-full text-left text-sm text-slate-700 whitespace-nowrap">
               <thead className="bg-white border-b border-slate-200 uppercase text-[10px] tracking-wider text-slate-400 font-bold">
                 <tr>
@@ -130,19 +161,48 @@ export default function HatoPage() {
                         {animal.sexo === 'Hembra' ? 'Preñada' : 'N/A'} {/* Mocked for UI accuracy */}
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <StatusBadge status={animal.activo ? 'Apto' : 'Retiro Carne'} />
+                        <StatusBadge status={animal.activo ? 'Apto' : (animal.tipoBaja || 'Inactivo')} />
                       </td>
                       <td className="px-6 py-4 text-slate-600 text-xs">
                         {animal.potrero || 'Potrero #1'}
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          <button className="px-4 py-1.5 bg-navy text-white text-xs font-semibold rounded-full hover:bg-navy-light transition-colors shadow-sm">
+                          <Link href={`/hato/${animal.id}`} className="px-4 py-1.5 bg-navy text-white text-xs font-semibold rounded-full hover:bg-navy-light transition-colors shadow-sm">
                             Expediente
-                          </button>
-                          <button className="p-1.5 text-slate-400 hover:text-navy border border-slate-200 rounded-full hover:bg-slate-50 transition-colors">
-                            <MoreVertical size={16} />
-                          </button>
+                          </Link>
+                          
+                          <div className="relative">
+                            <button 
+                              onClick={() => setActiveDropdownId(activeDropdownId === animal.id ? null : animal.id)}
+                              className="p-1.5 text-slate-400 hover:text-navy border border-slate-200 rounded-full hover:bg-slate-50 transition-colors"
+                            >
+                              <MoreVertical size={16} />
+                            </button>
+                            
+                            {activeDropdownId === animal.id && (
+                              <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 py-1 z-10 animate-in fade-in slide-in-from-top-2">
+                                <button 
+                                  onClick={() => {
+                                    setEditingAnimal(animal);
+                                    closeDropdown();
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                                >
+                                  <Edit2 size={16} /> Editar Datos
+                                </button>
+                                <button 
+                                  onClick={() => {
+                                    setBajaAnimal(animal);
+                                    closeDropdown();
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                >
+                                  <ArchiveX size={16} /> Dar de baja
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -153,6 +213,22 @@ export default function HatoPage() {
           </div>
         </section>
       </div>
+
+      {activeDropdownId && (
+        <div className="fixed inset-0 z-0" onClick={closeDropdown} />
+      )}
+
+      <ModalEditarAnimal 
+        isOpen={!!editingAnimal}
+        onClose={() => setEditingAnimal(null)}
+        animal={editingAnimal}
+      />
+
+      <ModalDarBaja
+        isOpen={!!bajaAnimal}
+        onClose={() => setBajaAnimal(null)}
+        animal={bajaAnimal}
+      />
     </main>
   );
 }
