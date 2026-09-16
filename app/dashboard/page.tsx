@@ -1,25 +1,41 @@
-﻿import Link from 'next/link';
+import { CalendarioReproductivo } from "@/components/dashboard/calendario-reproductivo";
+import { GlobalSearch } from "@/components/dashboard/global-search";
+import { KpiRow } from "@/components/dashboard/kpi-row";
+import { NotificationBell } from "@/components/dashboard/notification-bell";
+import { SemaforoSanitario } from "@/components/dashboard/semaforo-sanitario";
 
+/**
+ * MOD-04 — Dashboard + Motor de Alertas (responsable: Karla).
+ * Hoy corre 100% con datos de prueba (lib/mock/dashboard-mock.ts) — no depende de que
+ * ningún otro módulo esté terminado. Se conecta a datos reales endpoint por endpoint,
+ * a medida que Ari y Cristhian publiquen los suyos (ver lib/hooks/use-dashboard-data.ts).
+ */
 export default function DashboardPage() {
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-6 bg-surface">
-      <div className="w-full max-w-lg bg-card text-card-foreground border border-border rounded-xl shadow-sm p-8 text-center">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-success-bg text-success font-bold text-xl mb-4">
-          ✓
+    <div className="flex flex-1 flex-col gap-6 p-8 bg-[#F8FAFC] min-h-screen">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          {/* H1 — DESIGN.md: text-3xl font-bold tracking-tight text-slate-900 */}
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+            Dashboard
+          </h1>
+          {/* Body muted — DESIGN.md: text-sm text-slate-500 */}
+          <p className="text-sm text-slate-500 mt-1">
+            Vistazo rápido del estado del hato y las alertas activas.
+          </p>
         </div>
-        <h1 className="text-2xl font-bold text-foreground mb-2">
-          ¡Sesión iniciada con éxito!
-        </h1>
-        <p className="text-sm text-muted-foreground mb-6">
-          Bienvenido a ResDigital. Este es el espacio base para el Dashboard (MOD-04).
-        </p>
-        <Link
-          href="/"
-          className="inline-flex py-2 px-4 rounded-md border border-border bg-card text-foreground font-medium text-sm hover:bg-muted transition-colors shadow-sm"
-        >
-          Volver al Inicio
-        </Link>
+        <div className="flex items-center gap-3">
+          <GlobalSearch />
+          <NotificationBell />
+        </div>
+      </header>
+
+      <KpiRow />
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <SemaforoSanitario />
+        <CalendarioReproductivo />
       </div>
-    </main>
+    </div>
   );
 }
