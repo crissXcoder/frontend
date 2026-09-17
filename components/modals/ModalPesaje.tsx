@@ -7,9 +7,10 @@ interface ModalPesajeProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: any) => void;
+  animalSexo?: string;
 }
 
-export default function ModalPesaje({ isOpen, onClose, onSubmit }: ModalPesajeProps) {
+export default function ModalPesaje({ isOpen, onClose, onSubmit, animalSexo }: ModalPesajeProps) {
   const [formData, setFormData] = useState({
     fecha: '',
     peso_actual: '',
@@ -29,7 +30,7 @@ export default function ModalPesaje({ isOpen, onClose, onSubmit }: ModalPesajePr
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/40 backdrop-blur-sm p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between p-5 border-b border-slate-100">
-          <h2 className="text-lg font-bold text-navy">Registrar Pesaje / Leche</h2>
+          <h2 className="text-lg font-bold text-navy">Registrar {animalSexo === 'Macho' ? 'Pesaje' : 'Pesaje / Leche'}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
             <X className="w-5 h-5" />
           </button>
@@ -61,30 +62,34 @@ export default function ModalPesaje({ isOpen, onClose, onSubmit }: ModalPesajePr
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="block text-sm font-semibold text-navy">Leche Mañana (L)</label>
-              <input
-                type="number"
-                step="0.1"
-                min="0"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-light"
-                value={formData.leche_manana}
-                onChange={e => setFormData({ ...formData, leche_manana: e.target.value })}
-                placeholder="8.5"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="block text-sm font-semibold text-navy">Leche Tarde (L)</label>
-              <input
-                type="number"
-                step="0.1"
-                min="0"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-light"
-                value={formData.leche_tarde}
-                onChange={e => setFormData({ ...formData, leche_tarde: e.target.value })}
-                placeholder="5.0"
-              />
-            </div>
+            {animalSexo !== 'Macho' && (
+              <>
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-semibold text-navy">Leche Mañana (L)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-light"
+                    value={formData.leche_manana}
+                    onChange={e => setFormData({ ...formData, leche_manana: e.target.value })}
+                    placeholder="8.5"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-semibold text-navy">Leche Tarde (L)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-light"
+                    value={formData.leche_tarde}
+                    onChange={e => setFormData({ ...formData, leche_tarde: e.target.value })}
+                    placeholder="5.0"
+                  />
+                </div>
+              </>
+            )}
           </div>
 
           <div className="flex justify-end gap-3 pt-4 mt-2">

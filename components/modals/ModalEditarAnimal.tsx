@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { getCatalogosRazas } from '@/lib/api/catalogos';
-import { updateAnimal } from '@/lib/api/animales';
+import { updateAnimal, getAnimales } from '@/lib/api/animales';
 
 interface ModalEditarAnimalProps {
   isOpen: boolean;
@@ -27,6 +27,14 @@ export function ModalEditarAnimal({ isOpen, onClose, animal }: ModalEditarAnimal
     queryFn: getCatalogosRazas,
     enabled: isOpen,
   });
+
+  const { data: animales = [] } = useQuery({
+    queryKey: ['animales'],
+    queryFn: () => getAnimales(),
+    enabled: isOpen,
+  });
+
+  const potreros = Array.from(new Set(animales.map(a => a.potrero).filter(Boolean))).sort() as string[];
 
   useEffect(() => {
     if (animal && isOpen) {
@@ -160,14 +168,21 @@ export function ModalEditarAnimal({ isOpen, onClose, animal }: ModalEditarAnimal
               className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-light text-slate-700"
             >
               <option value="">— Seleccione categoría —</option>
-              <option value="Vaca en Producción">Vaca en Producción</option>
-              <option value="Vaca Seca">Vaca Seca</option>
-              <option value="Vaca Adulta">Vaca Adulta</option>
-              <option value="Ternera">Ternera</option>
-              <option value="Novilla">Novilla</option>
-              <option value="Toro">Toro</option>
-              <option value="Novillo">Novillo</option>
-              <option value="Ternero">Ternero</option>
+              {(!animal.sexo || animal.sexo === 'Hembra') && (
+                <>
+                  <option value="Ternera">Ternera</option>
+                  <option value="Novilla">Novilla</option>
+                  <option value="Vaca en Ordeño">Vaca en Ordeño</option>
+                  <option value="Vaca Seca">Vaca Seca</option>
+                </>
+              )}
+              {(!animal.sexo || animal.sexo === 'Macho') && (
+                <>
+                  <option value="Torete">Torete</option>
+                  <option value="Semental/Reproductor">Semental/Reproductor</option>
+                  <option value="Novillo de Engorde">Novillo de Engorde</option>
+                </>
+              )}
             </select>
           </div>
 
@@ -198,11 +213,9 @@ export function ModalEditarAnimal({ isOpen, onClose, animal }: ModalEditarAnimal
                 list="potreros-list"
               />
               <datalist id="potreros-list">
-                <option value="Potrero #1" />
-                <option value="Potrero #2" />
-                <option value="Potrero #3" />
-                <option value="Potrero #4" />
-                <option value="Potrero #5" />
+                {potreros.map(p => (
+                  <option key={p} value={p} />
+                ))}
               </datalist>
             </div>
           </div>

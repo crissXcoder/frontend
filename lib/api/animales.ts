@@ -20,6 +20,8 @@ export interface Animal {
   activo: boolean;
   madreId?: string;
   padreId?: string;
+  madre?: Animal;
+  padre?: Animal;
   fotoUrl?: string;
   raza?: Raza;
   
@@ -32,6 +34,13 @@ export interface Animal {
   metodoCompra?: 'Sinpe' | 'Depósito' | 'Efectivo' | 'Combinado';
   metodosCombinados?: string[];
   referenciaPago?: string;
+  
+  // Campos faltantes (TS Errors)
+  pesoActualKg?: number;
+  potrero?: string;
+  tipoBaja?: string;
+  motivoBaja?: string;
+  pesoFinalKg?: number;
 }
 
 export const getRazas = async (): Promise<Raza[]> => {
@@ -118,4 +127,11 @@ export const createTratamiento = async (tratamiento: any): Promise<any> => {
 
 export const getTratamientosByAnimal = async (animalId: string): Promise<any[]> => {
   return fetchApi(`/tratamientos/animal/${animalId}`);
+};
+
+export const updateTratamiento = async (id: string, data: any) => {
+  return fetchApi(`/tratamientos/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
 };

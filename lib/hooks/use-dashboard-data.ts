@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { getAnimales } from "@/lib/api/animales";
 import {
   getMockAlertas,
   getMockAnimalesEnRetiro,
@@ -28,7 +29,38 @@ const dashboardKeys = {
 export function useKpisDashboard() {
   return useQuery({
     queryKey: dashboardKeys.kpis,
-    queryFn: () => Promise.resolve(getMockKpis()),
+    queryFn: async () => {
+      const mockKpis = getMockKpis();
+      try {
+        const animales = await getAnimales();
+        const retiros = getMockAnimalesEnRetiro();
+        
+        const activos = animales.filter(a => a.activo);
+        const totalHatoActivo = activos.length;
+        
+        // B11: Vacas en Ordeño (Hembra, categoría Vaca en Ordeño, SIN retiro de leche)
+        const vacasEnOrdeno = activos.filter(a => {
+          if (a.categoria !== 'Vaca en Ordeño' || a.sexo !== 'Hembra') return false;
+          // Verificar si tiene retiro de leche activo en los mocks
+          const tieneRetiro = retiros.some(r => r.animalId === a.id && r.diasRestantesLeche !== null);
+          return !tieneRetiro;
+        }).length;
+        
+        // B4: Gestantes Confirmadas (solo con diagnóstico positivo)
+        // Ya que aún no hay endpoint real reproductivo, seguimos usando el mock
+        const gestantesConfirmadas = mockKpis.gestantesConfirmadas;
+        
+        return {
+          totalHatoActivo,
+          vacasEnOrdeno,
+          gestantesConfirmadas,
+          alertasActivas: mockKpis.alertasActivas
+        };
+      } catch (error) {
+        console.warn("Failed to fetch real animales for KPIs, falling back to mock", error);
+        return mockKpis;
+      }
+    },
   });
 }
 

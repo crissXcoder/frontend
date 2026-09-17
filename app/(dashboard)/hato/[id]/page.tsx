@@ -7,7 +7,7 @@ import autoTable from 'jspdf-autotable';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getAnimal, createPesaje, createServicio, createTratamiento, getPesajesByAnimal, getServiciosByAnimal, getTratamientosByAnimal, updateServicio, updateAnimal, getDocumentos, createDocumento } from '@/lib/api/animales';
+import { getAnimal, createPesaje, createServicio, createTratamiento, updateTratamiento, getPesajesByAnimal, getServiciosByAnimal, getTratamientosByAnimal, updateServicio, updateAnimal, getDocumentos, createDocumento } from '@/lib/api/animales';
 import { createClient } from '@/lib/supabase/client';
 import { 
   ChevronLeft, 
@@ -19,7 +19,8 @@ import {
   AlertTriangle,
   Pencil,
   CheckCircle2,
-  Loader2
+  Loader2,
+  FileText
 } from 'lucide-react';
 import ModalPesaje from '@/components/modals/ModalPesaje';
 import ModalServicio from '@/components/modals/ModalServicio';
@@ -27,6 +28,7 @@ import ModalTratamiento from '@/components/modals/ModalTratamiento';
 import ModalEditarOrigen from '@/components/modals/ModalEditarOrigen';
 import ModalDocumento from '@/components/modals/ModalDocumento';
 import { ModalEditarAnimal } from '@/components/modals/ModalEditarAnimal';
+import { ModalDarBaja } from '@/components/modals/ModalDarBaja';
 import { 
   LineChart, 
   Line, 
@@ -47,9 +49,11 @@ export default function ExpedienteAnimal() {
   const [isPesajeOpen, setIsPesajeOpen] = useState(false);
   const [isServicioOpen, setIsServicioOpen] = useState(false);
   const [isTratamientoOpen, setIsTratamientoOpen] = useState(false);
+  const [tratamientoSeleccionado, setTratamientoSeleccionado] = useState<any | null>(null);
   const [isOrigenOpen, setIsOrigenOpen] = useState(false);
   const [isDocumentoOpen, setIsDocumentoOpen] = useState(false);
   const [isEditarAnimalOpen, setIsEditarAnimalOpen] = useState(false);
+  const [isBajaOpen, setIsBajaOpen] = useState(false);
   
   // Documentos state
   const [isUploadingDoc, setIsUploadingDoc] = useState(false);
@@ -124,6 +128,19 @@ export default function ExpedienteAnimal() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tratamientos', animalId] });
       setIsTratamientoOpen(false);
+      setTratamientoSeleccionado(null);
+    }
+  });
+
+  const updateTratamientoMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string, data: any }) => updateTratamiento(id, {
+      ...data,
+      diasRetiro: data.dias_retiro ? parseInt(data.dias_retiro) : 0,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tratamientos', animalId] });
+      setIsTratamientoOpen(false);
+      setTratamientoSeleccionado(null);
     }
   });
 
@@ -231,6 +248,15 @@ export default function ExpedienteAnimal() {
         headStyles: { fillColor: [15, 23, 42] }
       });
       yPos = (doc as any).lastAutoTable.finalY + 15;
+    } else {
+      doc.setFontSize(14);
+      doc.setTextColor(15, 23, 42);
+      doc.text('Historial de Producción y Pesajes', 14, yPos);
+      yPos += 8;
+      doc.setFontSize(10);
+      doc.setTextColor(100, 116, 139);
+      doc.text('Sin registros', 14, yPos);
+      yPos += 15;
     }
 
     // Sección: Sanitario
@@ -259,6 +285,16 @@ export default function ExpedienteAnimal() {
         headStyles: { fillColor: [15, 23, 42] }
       });
       yPos = (doc as any).lastAutoTable.finalY + 15;
+    } else {
+      if (yPos > 250) { doc.addPage(); yPos = 20; }
+      doc.setFontSize(14);
+      doc.setTextColor(15, 23, 42);
+      doc.text('Historial Sanitario', 14, yPos);
+      yPos += 8;
+      doc.setFontSize(10);
+      doc.setTextColor(100, 116, 139);
+      doc.text('Sin registros', 14, yPos);
+      yPos += 15;
     }
 
     // Sección: Reproductivo
@@ -288,17 +324,29 @@ export default function ExpedienteAnimal() {
         headStyles: { fillColor: [15, 23, 42] }
       });
       yPos = (doc as any).lastAutoTable.finalY + 15;
+    } else {
+      if (yPos > 250) { doc.addPage(); yPos = 20; }
+      doc.setFontSize(14);
+      doc.setTextColor(15, 23, 42);
+      doc.text('Historial Reproductivo', 14, yPos);
+      yPos += 8;
+      doc.setFontSize(10);
+      doc.setTextColor(100, 116, 139);
+      doc.text('Sin registros', 14, yPos);
+      yPos += 15;
     }
 
     // Descargar
     doc.save(`Expediente_${animal.areteInterno}_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
+  const isMacho = animal?.sexo === 'Macho';
+
   const tabs = [
     { id: 'resumen', label: 'Resumen General' },
     { id: 'sanitario', label: 'Historial Sanitario' },
-    { id: 'reproductivo', label: 'Ciclo Reproductivo' },
-    { id: 'produccion', label: 'Pesajes y Leche' },
+    ...(!isMacho ? [{ id: 'reproductivo', label: 'Ciclo Reproductivo' }] : []),
+    { id: 'produccion', label: isMacho ? 'Historial de Pesajes' : 'Pesajes y Leche' },
     { id: 'documentos', label: 'Documentos' },
   ];
 
@@ -319,6 +367,36 @@ export default function ExpedienteAnimal() {
     );
   }
 
+  // Buscamos si hay un retiro sanitario activo en los tratamientos reales
+  let alertaRetiro = null;
+  const tratamientoConRetiro = tratamientos?.find((t) => {
+    if (!t.diasRetiro || t.diasRetiro <= 0) return false;
+    const fechaAplicacion = new Date(t.fecha);
+    const fechaLiberacion = new Date(fechaAplicacion.getTime() + t.diasRetiro * 24 * 60 * 60 * 1000);
+    const hoy = new Date();
+    // Normalizar a inicio del día
+    hoy.setHours(0, 0, 0, 0);
+    fechaLiberacion.setHours(0, 0, 0, 0);
+    return hoy < fechaLiberacion;
+  });
+
+  if (tratamientoConRetiro) {
+    const fechaAplicacion = new Date(tratamientoConRetiro.fecha);
+    const fechaLiberacion = new Date(fechaAplicacion.getTime() + tratamientoConRetiro.diasRetiro * 24 * 60 * 60 * 1000);
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    fechaLiberacion.setHours(0, 0, 0, 0);
+    const diasRestantes = Math.ceil((fechaLiberacion.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+    
+    alertaRetiro = {
+      farmaco: tratamientoConRetiro.farmaco || 'Desconocido',
+      aplicado: fechaAplicacion.toLocaleDateString(),
+      liberacion: fechaLiberacion.toLocaleDateString(),
+      diasRestantes
+    };
+  }
+  
+
   return (
     <div className="min-h-screen bg-slate-50 p-6">
       <div className="max-w-[1400px] mx-auto space-y-6">
@@ -330,6 +408,14 @@ export default function ExpedienteAnimal() {
             Volver al Hato
           </Link>
           <div className="flex items-center gap-3">
+            {animal.activo && (
+              <button 
+                onClick={() => setIsBajaOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 border border-red-200 text-red-600 rounded-lg text-sm font-semibold hover:bg-red-50 bg-white transition-colors"
+              >
+                Dar de Baja
+              </button>
+            )}
             <button 
               onClick={() => setIsEditarAnimalOpen(true)}
               className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 bg-white transition-colors"
@@ -381,7 +467,9 @@ export default function ExpedienteAnimal() {
                     <p>{new Date(animal.fechaNacimiento).toLocaleDateString()}</p>
                   )}
                   {animal.padreId && <p>Padre: <span className="font-semibold">{animal.padreId}</span></p>}
-                  {animal.madreId && <p>Madre: <span className="font-semibold">{animal.madreId}</span></p>}
+                  {animal.madreId && (
+                    <p>Madre: <span className="font-semibold text-primary">{animal.madre?.areteInterno ? `#${animal.madre.areteInterno} ${animal.madre.nombre || ''}` : animal.madreId}</span></p>
+                  )}
                 </div>
               </div>
             </div>
@@ -394,12 +482,14 @@ export default function ExpedienteAnimal() {
               >
                 Registrar Pesaje
               </button>
-              <button 
-                onClick={() => setIsServicioOpen(true)}
-                className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-sm hover:bg-blue-700 transition-colors"
-              >
-                Registrar Servicio
-              </button>
+              {!isMacho && (
+                <button 
+                  onClick={() => setIsServicioOpen(true)}
+                  className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-sm hover:bg-blue-700 transition-colors"
+                >
+                  Registrar Servicio
+                </button>
+              )}
               <button 
                 onClick={() => setIsTratamientoOpen(true)}
                 className="w-full sm:w-auto px-5 py-2.5 bg-red-600 text-white rounded-lg text-sm font-bold shadow-sm hover:bg-red-700 transition-colors"
@@ -415,7 +505,8 @@ export default function ExpedienteAnimal() {
             </div>
           </div>
 
-          {/* Dots Timeline */}
+          {/* Dots Timeline (Mockups comentados para no confundir al usuario con datos falsos) */}
+          {/*
           <div className="bg-slate-50 border-t border-slate-200 p-3 sm:px-8 flex flex-wrap items-center gap-6 text-[13px]">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-orange-500"></div>
@@ -434,6 +525,7 @@ export default function ExpedienteAnimal() {
               <span className="text-slate-600">Retiro hasta: <span className="font-bold text-red-600">24/08/2026</span> <span className="text-slate-400">· 2 días</span></span>
             </div>
           </div>
+          */}
         </div>
 
         {/* Tabs */}
@@ -458,17 +550,18 @@ export default function ExpedienteAnimal() {
           {activeTab === 'resumen' && (
             <div className="space-y-6">
               
-              {/* Alerta Médica */}
-              <div className="bg-red-50 border border-red-200 rounded-xl p-5 flex items-start gap-4 shadow-sm">
-                <AlertTriangle className="w-6 h-6 text-red-600 shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <h3 className="text-sm font-extrabold text-red-700 tracking-wide">RETIRO SANITARIO ACTIVO</h3>
-                  <p className="text-sm font-medium text-red-600">
-                    Fármaco: <span className="font-bold">Cefalexina 200 Intramamaria</span> · Aplicado: <span className="font-bold">19/08/2026</span> · Liberación: <span className="font-bold">24/08/2026</span> · Días restantes: <span className="font-bold">2</span>
-                  </p>
-                  <p className="text-[13px] text-red-500/80">⚠ Leche no comercializable hasta la fecha de liberación.</p>
+              {alertaRetiro && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-5 flex items-start gap-4 shadow-sm mb-6">
+                  <AlertTriangle className="w-6 h-6 text-red-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-extrabold text-red-700 tracking-wide">RETIRO SANITARIO ACTIVO</h3>
+                    <p className="text-sm font-medium text-red-600">
+                      Fármaco: <span className="font-bold">{alertaRetiro.farmaco}</span> · Aplicado: <span className="font-bold">{alertaRetiro.aplicado}</span> · Liberación: <span className="font-bold">{alertaRetiro.liberacion}</span> · Días restantes: <span className="font-bold">{alertaRetiro.diasRestantes}</span>
+                    </p>
+                    <p className="text-[13px] text-red-500/80">⚠ Leche y/o carne no comercializable hasta la fecha de liberación.</p>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Pedigrí y Genealogía */}
               <div className="bg-white border border-slate-200 rounded-xl p-6 sm:p-8 shadow-sm relative">
@@ -509,7 +602,7 @@ export default function ExpedienteAnimal() {
                     {/* Padre */}
                     <div className="bg-white border border-slate-200 rounded-xl p-4 w-[45%] shadow-sm hover:border-slate-300 transition-colors">
                       <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Padre (Semental / Pajilla)</div>
-                      <div className="font-bold text-navy text-base">{animal.padre ? `Semental #${animal.padre.areteInterno} ${animal.padre.nombre || ''}` : 'No registrado'}</div>
+                      <div className="font-bold text-navy text-base">{animal.padreId ? `Semental #${animal.padreId}` : 'No registrado'}</div>
                       <div className="flex items-center gap-2 mt-2 text-xs font-semibold">
                       </div>
                     </div>
@@ -517,7 +610,9 @@ export default function ExpedienteAnimal() {
                     {/* Madre */}
                     <div className="bg-green-50/30 border border-green-200 rounded-xl p-4 w-[45%] shadow-sm hover:border-green-300 transition-colors">
                       <div className="text-[10px] font-bold text-green-600 uppercase tracking-wide mb-1">Madre (Vaca Matriz / Dam)</div>
-                      <div className="font-bold text-navy text-base">{animal.madre ? `Matriz #${animal.madre.areteInterno} ${animal.madre.nombre || ''}` : 'No registrada'}</div>
+                      <div className="font-bold text-navy text-base">
+                        {animal.madre ? `Matriz #${animal.madre.areteInterno} ${animal.madre.nombre || ''}` : (animal.madreId ? `Matriz (ID: ${animal.madreId})` : 'No registrada')}
+                      </div>
                       <div className="flex items-center gap-2 mt-2 text-xs font-semibold">
                       </div>
                     </div>
@@ -541,11 +636,12 @@ export default function ExpedienteAnimal() {
                 </div>
               </div>
 
-              {/* Línea de Tiempo Gestación */}
-              <div className="bg-white border border-slate-200 rounded-xl p-6 sm:p-8 shadow-sm">
-                <h3 className="text-lg font-bold text-navy mb-8">Línea de Tiempo Gestación</h3>
-                
-                <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-slate-200">
+              {/* Línea de Tiempo Gestación - Solo Hembras */}
+              {!isMacho && (
+                <div className="bg-white border border-slate-200 rounded-xl p-6 sm:p-8 shadow-sm">
+                  <h3 className="text-lg font-bold text-navy mb-8">Línea de Tiempo Gestación</h3>
+                  
+                  <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-slate-200">
                   
                   {/* Step 1 */}
                   <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
@@ -608,7 +704,7 @@ export default function ExpedienteAnimal() {
                     </div>
                     <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-transparent p-4 flex justify-between items-center">
                       <div>
-                        <div className="font-bold text-slate-600 text-sm">FPP (Día 280)</div>
+                        <div className="font-bold text-slate-600 text-sm">FPP (Día {animal?.raza?.dias_gestacion || 280})</div>
                         <div className="text-xs text-slate-400 mt-0.5">15/10/2026</div>
                       </div>
                     </div>
@@ -616,6 +712,7 @@ export default function ExpedienteAnimal() {
 
                 </div>
               </div>
+              )}
 
             </div>
           )}
@@ -641,8 +738,9 @@ export default function ExpedienteAnimal() {
                       <th className="p-4">Dosis</th>
                       <th className="p-4">Vía</th>
                       <th className="p-4">Médico</th>
-                      <th className="p-4">Retiro Leche</th>
-                      <th className="p-4 pr-6 sm:pr-8">Fecha Liberación</th>
+                      <th className="p-4">{isMacho ? 'Días Retiro (Carne)' : 'Retiro Leche'}</th>
+                      <th className="p-4">Fecha Liberación</th>
+                      <th className="p-4 pr-6 sm:pr-8 text-right">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm text-slate-600">
@@ -653,9 +751,9 @@ export default function ExpedienteAnimal() {
                         <td className="p-4">{t.diagnostico}</td>
                         <td className="p-4">{t.dosis}</td>
                         <td className="p-4">{t.via}</td>
-                        <td className="p-4 text-sky-600">{t.medico}</td>
+                        <td className="p-4 text-sky-600">{t.veterinario || '-'}</td>
                         <td className="p-4 font-bold text-red-600">{t.diasRetiro}d</td>
-                        <td className="p-4 pr-6 sm:pr-8">
+                        <td className="p-4">
                           {(() => {
                             if (!t.diasRetiro) return '-';
                             const date = new Date(t.fecha);
@@ -663,11 +761,34 @@ export default function ExpedienteAnimal() {
                             return date.toLocaleDateString();
                           })()}
                         </td>
+                        <td className="p-4 pr-6 sm:pr-8 text-right space-x-3">
+                          {t.documentoUrl && (
+                            <a 
+                              href={t.documentoUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-blue-500 hover:text-blue-700 transition-colors inline-block"
+                              title="Ver documento"
+                            >
+                              <FileText className="w-4 h-4" />
+                            </a>
+                          )}
+                          <button
+                            onClick={() => {
+                              setTratamientoSeleccionado(t);
+                              setIsTratamientoOpen(true);
+                            }}
+                            className="text-slate-400 hover:text-blue-600 transition-colors inline-block"
+                            title="Editar tratamiento"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                     {(!tratamientos || tratamientos.length === 0) && (
                       <tr>
-                        <td colSpan={8} className="p-8 text-center text-slate-400">
+                        <td colSpan={9} className="p-8 text-center text-slate-400">
                           No hay tratamientos registrados
                         </td>
                       </tr>
@@ -709,7 +830,7 @@ export default function ExpedienteAnimal() {
                       const fechaServicio = new Date(s.fecha);
                       const fpp = new Date(fechaServicio);
                       fpp.setDate(fpp.getDate() + 283);
-                      
+                      const fechaParto = new Date(fechaServicio.getTime() + (animal.raza?.dias_gestacion || 283) * 24 * 60 * 60 * 1000);
                       const palpacion = new Date(fechaServicio);
                       palpacion.setDate(palpacion.getDate() + 40);
 
@@ -768,35 +889,39 @@ export default function ExpedienteAnimal() {
           {activeTab === 'produccion' && (
             <div className="space-y-6 mt-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-                  <h3 className="text-sm font-bold text-navy mb-4">Curva de Lactancia (L/día)</h3>
-                  <div className="h-48 w-full">
+                {!isMacho && (
+                  <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                    <h3 className="text-sm font-bold text-navy mb-4">Curva de Lactancia (L/día)</h3>
+                    <div className="h-48 w-full">
                     {pesajes && pesajes.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
+                        {/* design-exception: Recharts requiere valores estáticos/hex para sus props */}
                         <LineChart data={[...pesajes].reverse()} margin={{ top: 5, right: 5, bottom: 5, left: -20 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                           <XAxis dataKey="fecha" tickFormatter={(val) => new Date(val).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })} tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                           <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                          <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} labelFormatter={(val) => new Date(val).toLocaleDateString()} />
+                          <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} labelFormatter={(val: any) => new Date(val).toLocaleDateString()} />
                           <Line type="monotone" dataKey={(p) => (Number(p.lecheMananaL) || 0) + (Number(p.lecheTardeL) || 0)} stroke="#0284c7" strokeWidth={3} dot={{ r: 4, fill: '#0284c7', strokeWidth: 0 }} activeDot={{ r: 6, fill: '#0284c7' }} name="Total Leche (L)" />
                         </LineChart>
                       </ResponsiveContainer>
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-slate-300 text-xs">Sin datos de lactancia</div>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
                 
                 <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
                   <h3 className="text-sm font-bold text-navy mb-4">Evolución de Peso (kg)</h3>
                   <div className="h-48 w-full">
                     {pesajes && pesajes.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
+                        {/* design-exception: Recharts requiere valores estáticos/hex para sus props */}
                         <LineChart data={[...pesajes].reverse()} margin={{ top: 5, right: 5, bottom: 5, left: -20 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                           <XAxis dataKey="fecha" tickFormatter={(val) => new Date(val).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })} tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                           <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} domain={['dataMin - 10', 'auto']} />
-                          <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} labelFormatter={(val) => new Date(val).toLocaleDateString()} />
+                          <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} labelFormatter={(val: any) => new Date(val).toLocaleDateString()} />
                           <Line type="monotone" dataKey={(p) => Number(p.pesoActualKg) || 0} stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 6, fill: '#10b981' }} name="Peso (kg)" />
                         </LineChart>
                       </ResponsiveContainer>
@@ -809,7 +934,9 @@ export default function ExpedienteAnimal() {
 
               <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
                 <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-navy">Historial de Pesajes y Producción</h3>
+                  <h3 className="text-lg font-bold text-navy">
+                    {isMacho ? 'Historial de Pesajes' : 'Historial de Pesajes y Producción'}
+                  </h3>
                   <button 
                     onClick={() => setIsPesajeOpen(true)}
                     className="px-4 py-2 bg-navy text-white rounded-lg text-sm font-bold shadow-sm hover:bg-navy-light transition-colors"
@@ -823,7 +950,9 @@ export default function ExpedienteAnimal() {
                       <div className="flex items-center justify-between pb-2 mb-2 border-b-2 border-slate-100">
                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider w-1/3">Fecha</span>
                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider w-1/3">Peso (kg)</span>
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider w-1/3 text-right">Leche Total (L)</span>
+                        {!isMacho && (
+                          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider w-1/3 text-right">Leche Total (L)</span>
+                        )}
                       </div>
                     )}
                     {pesajes?.map((p: any) => {
@@ -832,9 +961,11 @@ export default function ExpedienteAnimal() {
                         <div key={p.id} className="flex items-center justify-between py-2 border-b border-slate-100">
                           <span className="text-sm text-slate-500 w-1/3">{new Date(p.fecha).toLocaleDateString()}</span>
                           <span className="text-sm font-bold text-navy w-1/3">{p.pesoActualKg ? `${p.pesoActualKg} kg` : '-'}</span>
-                          <span className="text-sm font-bold text-green-600 w-1/3 text-right">
-                            {totalLeche > 0 ? `${totalLeche.toFixed(1)} L` : '-'}
-                          </span>
+                          {!isMacho && (
+                            <span className="text-sm font-bold text-green-600 w-1/3 text-right">
+                              {totalLeche > 0 ? `${totalLeche.toFixed(1)} L` : '-'}
+                            </span>
+                          )}
                         </div>
                       );
                     })}
@@ -912,6 +1043,7 @@ export default function ExpedienteAnimal() {
         isOpen={isPesajeOpen} 
         onClose={() => setIsPesajeOpen(false)} 
         onSubmit={(data) => pesajeMutation.mutate(data)} 
+        animalSexo={animal?.sexo}
       />
       <ModalServicio 
         isOpen={isServicioOpen} 
@@ -920,8 +1052,19 @@ export default function ExpedienteAnimal() {
       />
       <ModalTratamiento 
         isOpen={isTratamientoOpen} 
-        onClose={() => setIsTratamientoOpen(false)} 
-        onSubmit={(data) => tratamientoMutation.mutate(data)} 
+        onClose={() => {
+          setIsTratamientoOpen(false);
+          setTratamientoSeleccionado(null);
+        }} 
+        initialData={tratamientoSeleccionado}
+        animalSexo={animal?.sexo}
+        onSubmit={(data) => {
+          if (tratamientoSeleccionado) {
+            updateTratamientoMutation.mutate({ id: tratamientoSeleccionado.id, data });
+          } else {
+            tratamientoMutation.mutate(data);
+          }
+        }} 
       />
       <ModalEditarOrigen 
         isOpen={isOrigenOpen} 
@@ -945,6 +1088,22 @@ export default function ExpedienteAnimal() {
         onSubmit={handleDocumentSubmit}
         isUploading={isUploadingDoc}
       />
+      
+      {isEditarAnimalOpen && (
+        <ModalEditarAnimal 
+          isOpen={isEditarAnimalOpen} 
+          onClose={() => setIsEditarAnimalOpen(false)} 
+          animal={animal} 
+        />
+      )}
+      
+      {isBajaOpen && (
+        <ModalDarBaja 
+          isOpen={isBajaOpen} 
+          onClose={() => setIsBajaOpen(false)} 
+          animal={animal} 
+        />
+      )}
 
     </div>
   );

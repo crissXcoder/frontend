@@ -51,6 +51,8 @@ export default function NuevoAnimalPage() {
     queryFn: () => getAnimales(),
   });
 
+  const potreros = Array.from(new Set(animales.map(a => a.potrero).filter(Boolean))).sort() as string[];
+
   const createMutation = useMutation({
     mutationFn: createAnimal,
     onSuccess: () => {
@@ -296,13 +298,21 @@ export default function NuevoAnimalPage() {
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-light bg-white"
                 >
                   <option value="">— Seleccione categoría —</option>
-                  <option value="Ternera">Ternera</option>
-                  <option value="Novilla">Novilla</option>
-                  <option value="Vaca en Ordeño">Vaca en Ordeño</option>
-                  <option value="Vaca Seca">Vaca Seca</option>
-                  <option value="Torete">Torete</option>
-                  <option value="Semental/Reproductor">Semental/Reproductor</option>
-                  <option value="Novillo de Engorde">Novillo de Engorde</option>
+                  {(!formData.sexo || formData.sexo === 'Hembra') && (
+                    <>
+                      <option value="Ternera">Ternera</option>
+                      <option value="Novilla">Novilla</option>
+                      <option value="Vaca en Ordeño">Vaca en Ordeño</option>
+                      <option value="Vaca Seca">Vaca Seca</option>
+                    </>
+                  )}
+                  {(!formData.sexo || formData.sexo === 'Macho') && (
+                    <>
+                      <option value="Torete">Torete</option>
+                      <option value="Semental/Reproductor">Semental/Reproductor</option>
+                      <option value="Novillo de Engorde">Novillo de Engorde</option>
+                    </>
+                  )}
                 </select>
               </div>
 
@@ -331,16 +341,20 @@ export default function NuevoAnimalPage() {
 
               <div className="col-span-1 sm:col-span-2 space-y-1.5">
                 <label className="block text-sm font-semibold text-navy">Potrero</label>
-                <select
+                <input
+                  type="text"
                   name="potrero"
                   value={formData.potrero}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-light bg-white"
-                >
-                  <option value="">— Seleccione —</option>
-                  <option value="Potrero 1">Potrero 1</option>
-                  <option value="Potrero 2">Potrero 2</option>
-                </select>
+                  placeholder="Ej: Potrero 4"
+                  list="potreros-list"
+                />
+                <datalist id="potreros-list">
+                  {potreros.map(p => (
+                    <option key={p} value={p} />
+                  ))}
+                </datalist>
               </div>
             </div>
           </div>
@@ -408,7 +422,7 @@ export default function NuevoAnimalPage() {
             )}
 
             {formData.origen === 'Externa' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-5 rounded-xl border border-amber-200/60 bg-[#FDF8E7]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-5 rounded-xl border border-warning/30 bg-warning-bg">
                 <div className="space-y-1.5">
                   <label className="block text-sm font-semibold text-navy">Comprado a / Ganadería</label>
                   <input
