@@ -37,7 +37,8 @@ export interface Animal {
   
   // Campos faltantes (TS Errors)
   pesoActualKg?: number;
-  potrero?: string;
+  potreroId?: string;
+  potrero?: { id: string; nombre: string; };
   tipoBaja?: string;
   motivoBaja?: string;
   pesoFinalKg?: number;
@@ -100,20 +101,13 @@ export const getPesajesByAnimal = async (animalId: string): Promise<any[]> => {
   return fetchApi(`/pesajes/animal/${animalId}`);
 };
 
-export const createServicio = async (servicio: any): Promise<any> => {
-  return fetchApi('/servicios', {
+export const getEstadoReproductivo = async (animalId: string): Promise<any> => {
+  return fetchApi(`/animales/${animalId}/estado-reproductivo`);
+};
+
+export const createServicioReproductivo = async (animalId: string, data: any): Promise<any> => {
+  return fetchApi(`/animales/${animalId}/servicios`, {
     method: 'POST',
-    body: JSON.stringify(servicio),
-  });
-};
-
-export const getServiciosByAnimal = async (animalId: string): Promise<any[]> => {
-  return fetchApi(`/servicios/animal/${animalId}`);
-};
-
-export const updateServicio = async (id: string, data: any) => {
-  return fetchApi(`/servicios/${id}`, {
-    method: 'PATCH',
     body: JSON.stringify(data),
   });
 };
