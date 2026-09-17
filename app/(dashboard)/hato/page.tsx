@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getAnimales } from '@/lib/api/animales';
+import { getAnimales, getRazas } from '@/lib/api/animales';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Search, Plus, MoreVertical, Edit2, ArchiveX } from 'lucide-react';
 import Link from 'next/link';
@@ -22,6 +22,11 @@ export default function HatoPage() {
     queryFn: () => getAnimales(),
   });
 
+  const { data: razas = [] } = useQuery({
+    queryKey: ['razas'],
+    queryFn: () => getRazas(),
+  });
+
   // Cerrar dropdown al hacer click fuera (simple hack with an overlay)
   const closeDropdown = () => setActiveDropdownId(null);
 
@@ -32,15 +37,15 @@ export default function HatoPage() {
       (animal.nombre && animal.nombre.toLowerCase().includes(searchTerm.toLowerCase()));
 
     // Filter by raza
-    const razaName = animal.razaOtra ? animal.razaOtra : animal.raza?.nombre;
-    const matchesRaza = filterRaza === '' || (razaName && razaName.toLowerCase().includes(filterRaza.toLowerCase()));
+    const searchRaza = filterRaza.toLowerCase();
+    const razaName = (animal.razaOtra || animal.raza?.nombre || '').toLowerCase();
+    const matchesRaza = filterRaza === '' || razaName.includes(searchRaza);
 
     // Filter by status (sanitario/activo)
-    // In the UI we map animal.activo ? 'Apto' : (animal.tipoBaja || 'Inactivo')
     const statusLabel = animal.activo ? 'Apto' : (animal.tipoBaja || 'Inactivo');
     const matchesSanitario = filterSanitario === '' || statusLabel.toLowerCase() === filterSanitario.toLowerCase();
 
-    return matchesSearch && matchesRaza && matchesSanitario;
+    return Boolean(matchesSearch && matchesRaza && matchesSanitario);
   });
 
   return (
@@ -78,10 +83,11 @@ export default function HatoPage() {
               className="px-4 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-navy-light min-w-[160px]"
             >
               <option value="">Todas las razas</option>
-              <option value="girolando">Girolando</option>
-              <option value="brahman">Brahman</option>
-              <option value="nelore">Nelore</option>
-              <option value="holstein">Holstein</option>
+              {razas.map(raza => (
+                <option key={raza.id} value={raza.nombre.toLowerCase()}>
+                  {raza.nombre}
+                </option>
+              ))}
             </select>
             <select 
               value={filterSanitario}
@@ -93,6 +99,8 @@ export default function HatoPage() {
               <option value="Inactivo">Inactivo</option>
               <option value="Fallecimiento">Fallecimiento</option>
               <option value="Venta Comercial">Venta Comercial</option>
+              <option value="Descarte">Descarte</option>
+              <option value="Traslado">Traslado</option>
             </select>
           </div>
         </div>
@@ -152,7 +160,29 @@ export default function HatoPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-slate-600 text-xs">{animal.fechaNacimiento ? new Date(animal.fechaNacimiento).toLocaleDateString() : 'N/A'}</div>
-                        <div className="text-blue-500 text-xs font-semibold mt-0.5">4 años</div> {/* Mocked age for UI accuracy */}
+                        <div className="text-blue-500 text-xs font-semibold mt-0.5">
+                          {(() => {
+                            if (!animal.fechaNacimiento) return '-';
+                            const birth = new Date(animal.fechaNacimiento);
+                            const now = new Date();
+                            
+                            let years = now.getFullYear() - birth.getFullYear();
+                            let months = now.getMonth() - birth.getMonth();
+
+                            if (months < 0 || (months === 0 && now.getDate() < birth.getDate())) {
+                              years--;
+                              months += 12;
+                            }
+                            
+                            if (years > 0) {
+                              return `${years} año${years !== 1 ? 's' : ''}`;
+                            } else if (months > 0) {
+                              return `${months} mes${months !== 1 ? 'es' : ''}`;
+                            } else {
+                              return 'Menos de 1 mes';
+                            }
+                          })()}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-slate-600 text-xs">
                         {animal.categoria || 'Vaca Adulta'}

@@ -12,11 +12,21 @@ import {
   Map, 
   QrCode, 
   DatabaseBackup,
-  User
+  User,
+  Loader2
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { getAnimales } from '@/lib/api/animales';
 
 export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const pathname = usePathname();
+
+  const { data: animales, isLoading } = useQuery({
+    queryKey: ['animales'],
+    queryFn: () => getAnimales(),
+  });
+
+  const resesActivas = animales ? animales.filter(a => a.activo).length : 0;
 
   const navItems = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -40,7 +50,7 @@ export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
 
       {/* Sidebar */}
       <aside className={`
-        fixed top-0 left-0 z-50 h-full w-64 bg-[#1a2332] text-slate-300 flex flex-col
+        fixed top-0 left-0 z-50 h-full w-64 bg-navy text-slate-300 flex flex-col
         transition-transform duration-300 ease-in-out lg:translate-x-0
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
@@ -60,7 +70,14 @@ export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
         <div className="px-6 py-5 border-b border-slate-700/50">
           <p className="text-[10px] font-bold text-slate-500 tracking-wider mb-1">FINCA ACTIVA</p>
           <p className="text-sm font-semibold text-white">Finca San Martín</p>
-          <p className="text-xs text-slate-400 mt-0.5">7 reses activas</p>
+          <div className="flex items-center gap-2 mt-0.5">
+            {isLoading ? (
+              <Loader2 className="w-3 h-3 text-slate-400 animate-spin" />
+            ) : null}
+            <p className="text-xs text-slate-400">
+              {isLoading ? 'Cargando...' : `${resesActivas} reses activas`}
+            </p>
+          </div>
         </div>
 
         {/* Navigation */}
@@ -77,8 +94,8 @@ export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
                     className={`
                       flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors relative
                       ${isActive 
-                        ? 'bg-[#253043] text-white font-medium' 
-                        : 'hover:bg-[#253043] hover:text-white'
+                        ? 'bg-navy-light text-white font-medium' 
+                        : 'hover:bg-navy-light hover:text-white'
                       }
                     `}
                   >
@@ -87,7 +104,7 @@ export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
                     
                     {/* Active dot indicator */}
                     {isActive && (
-                      <div className="absolute right-3 w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+                      <div className="absolute right-3 w-1.5 h-1.5 rounded-full bg-success shadow-[0_0_8px_var(--color-success)]" />
                     )}
                   </Link>
                 </li>
@@ -98,7 +115,7 @@ export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
 
         {/* Bottom Actions */}
         <div className="p-4 border-t border-slate-700/50">
-          <button className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-slate-400 hover:bg-[#253043] hover:text-white transition-colors text-left">
+          <button className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-slate-400 hover:bg-navy-light hover:text-white transition-colors text-left">
             <DatabaseBackup size={18} />
             Restaurar Base de Datos
           </button>

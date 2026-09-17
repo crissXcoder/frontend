@@ -59,22 +59,25 @@ export default function ModalDocumento({ isOpen, onClose, onSubmit, isUploading 
             <label className="block text-sm font-semibold text-slate-700 mb-2">
               Tipo de Documento
             </label>
-            <select 
+            <input 
+              type="text"
+              list="docTypes"
               value={tipo}
               onChange={(e) => setTipo(e.target.value)}
               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy transition-all"
+              placeholder="Ej. Certificado de Pedigrí"
               required
               disabled={isUploading}
-            >
-              <option value="">Selecciona el tipo</option>
-              <option value="Certificado de Pedigrí">Certificado de Pedigrí</option>
-              <option value="Permiso Sanitario">Permiso Sanitario</option>
-              <option value="Guía de Movilización">Guía de Movilización</option>
-              <option value="Vacuna Aftosa">Vacuna Aftosa</option>
-              <option value="Prueba de Brucelosis">Prueba de Brucelosis</option>
-              <option value="Historial Clínico">Historial Clínico</option>
-              <option value="Otro">Otro</option>
-            </select>
+            />
+            <datalist id="docTypes">
+              <option value="Certificado de Pedigrí" />
+              <option value="Permiso Sanitario" />
+              <option value="Guía de Movilización" />
+              <option value="Vacuna Aftosa" />
+              <option value="Prueba de Brucelosis" />
+              <option value="Historial Clínico" />
+              <option value="Factura de Compra" />
+            </datalist>
           </div>
 
           <div>

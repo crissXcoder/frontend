@@ -7,9 +7,10 @@ interface ModalServicioProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: any) => void;
+  animalSexo?: string;
 }
 
-export default function ModalServicio({ isOpen, onClose, onSubmit }: ModalServicioProps) {
+export default function ModalServicio({ isOpen, onClose, onSubmit, animalSexo }: ModalServicioProps) {
   const [formData, setFormData] = useState({
     tipo_servicio: 'Inseminación Artificial',
     fecha: '',
@@ -110,7 +111,7 @@ export default function ModalServicio({ isOpen, onClose, onSubmit }: ModalServic
           </div>
 
           {formData.fecha && (
-            <div className="bg-[#EEF4FF] border border-[#D5E4FF] rounded-xl p-4 mt-2">
+            <div className="bg-info-bg border border-info/30 rounded-xl p-4 mt-2">
               <h3 className="text-xs font-bold text-navy uppercase tracking-wide mb-3">Hitos Calculados Automáticamente</h3>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="bg-white rounded-lg p-2.5 text-center border border-white/60 shadow-sm">
