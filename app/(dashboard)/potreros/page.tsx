@@ -243,7 +243,7 @@ export default function PotrerosPage() {
             setIsFormOpen(false);
             setEditingPotrero(null);
           }} 
-          potreroEdit={editingPotrero}
+          potrero={editingPotrero}
         />
       )}
     </main>

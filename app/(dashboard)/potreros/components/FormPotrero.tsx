@@ -117,7 +117,7 @@ export function FormPotrero({ potrero, onClose }: FormPotreroProps) {
                   type="number" 
                   min="1"
                   value={formData.diasDescansoRecomendados}
-                  onChange={e => setFormData({...formData, diasDescansoRecomendados: e.target.value})}
+                  onChange={e => setFormData({...formData, diasDescansoRecomendados: Number(e.target.value) || 0})}
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy-light text-slate-700"
                 />
               </div>

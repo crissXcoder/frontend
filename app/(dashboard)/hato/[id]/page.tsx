@@ -103,8 +103,11 @@ export default function ExpedienteAnimal() {
 
   const servicioMutation = useMutation({
     mutationFn: (data: any) => createServicioReproductivo(animalId, { 
-      ...data,
+      fechaEvento: data.fecha,
       tipoServicio: data.tipo_servicio,
+      toroOPajilla: data.semental,
+      responsable: data.inseminador,
+      notas: data.observaciones
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['estadoReproductivo', animalId] });
@@ -291,7 +294,8 @@ export default function ExpedienteAnimal() {
     }
 
     // Sección: Reproductivo
-    if (servicios && servicios.length > 0) {
+    const serviciosActivos = estadoReproductivo?.servicioActivo ? [estadoReproductivo.servicioActivo] : [];
+    if (serviciosActivos.length > 0) {
       if (yPos > 250) { doc.addPage(); yPos = 20; }
       
       doc.setFontSize(14);
@@ -299,12 +303,12 @@ export default function ExpedienteAnimal() {
       doc.text('Historial Reproductivo', 14, yPos);
       yPos += 5;
       
-      const tableData = servicios.map((s: any) => {
+      const tableData = serviciosActivos.map((s: any) => {
         return [
-          s.fecha ? new Date(s.fecha).toLocaleDateString() : '-',
+          s.fechaEvento || s.fecha ? new Date(s.fechaEvento || s.fecha).toLocaleDateString() : '-',
           s.tipoServicio || '-',
-          s.semental || '-',
-          s.estadoPalpacion || 'Pendiente'
+          s.toroOPajilla || s.semental || '-',
+          estadoReproductivo?.ultimoDiagnostico?.resultado || 'Pendiente'
         ];
       });
 
@@ -704,8 +708,8 @@ export default function ExpedienteAnimal() {
                     </div>
                     <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-transparent p-4 flex justify-between items-center">
                       <div>
-                        <div className="font-bold text-slate-600 text-sm">FPP (Día {animal?.raza?.dias_gestacion || 280})</div>
-                        <div className="text-xs text-slate-400 mt-0.5">15/10/2026</div>
+                        <div className="font-bold text-slate-600 text-sm">FPP</div>
+                        <div className="text-xs text-slate-400 mt-0.5">{estadoReproductivo?.servicioActivo?.fpp ? new Date(estadoReproductivo.servicioActivo.fpp).toLocaleDateString() : 'Pendiente de cálculo'}</div>
                       </div>
                     </div>
                   </div>
@@ -826,13 +830,28 @@ export default function ExpedienteAnimal() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm text-slate-600">
-                    {(Array.isArray(estadoReproductivo) ? estadoReproductivo : estadoReproductivo?.servicios || [])?.map((s: any) => {
-                      const fechaServicio = new Date(s.fecha);
-                      const fpp = new Date(fechaServicio);
-                      fpp.setDate(fpp.getDate() + 283);
-                      const fechaParto = new Date(fechaServicio.getTime() + (animal.raza?.dias_gestacion || 283) * 24 * 60 * 60 * 1000);
-                      const palpacion = new Date(fechaServicio);
-                      palpacion.setDate(palpacion.getDate() + 40);
+                    {(estadoReproductivo?.servicioActivo ? [estadoReproductivo.servicioActivo] : [])?.map((s: any) => {
+                      const fechaServicio = new Date(s.fechaEvento || s.fecha);
+                      // Usar la FPP retornada por MOD-03, o calcular fallback si falta
+                      const fppString = s.fpp || estadoReproductivo?.servicioActivo?.fpp;
+                      let fpp: Date;
+                      if (fppString) {
+                        fpp = new Date(fppString);
+                      } else if (animal.raza?.dias_gestacion) {
+                        fpp = new Date(fechaServicio);
+                        fpp.setDate(fpp.getDate() + animal.raza.dias_gestacion);
+                      } else {
+                        fpp = null;
+                      }
+                      
+                      const palpacionString = s.palpacionFecha || estadoReproductivo?.servicioActivo?.palpacionFecha;
+                      let palpacion: Date;
+                      if (palpacionString) {
+                        palpacion = new Date(palpacionString);
+                      } else {
+                        palpacion = new Date(fechaServicio);
+                        palpacion.setDate(palpacion.getDate() + 40);
+                      }
 
                       return (
                         <tr key={s.id} className="hover:bg-slate-50 transition-colors">
@@ -843,24 +862,24 @@ export default function ExpedienteAnimal() {
                           <td className="p-4">{s.semental || '-'}</td>
                           <td className="p-4 text-sky-600">{s.inseminador || '-'}</td>
                           <td className="p-4">{s.potrero || '-'}</td>
-                          <td className="p-4 font-bold text-green-600">{fpp.toLocaleDateString()}</td>
+                          <td className="p-4 font-bold text-green-600">{fpp ? fpp.toLocaleDateString() : 'Pendiente'}</td>
                           <td className="p-4 font-bold text-orange-500">
                             {s.fechaPalpacion ? new Date(new Date(s.fechaPalpacion).getTime() + new Date().getTimezoneOffset() * 60000).toLocaleDateString() : palpacion.toLocaleDateString()}
                           </td>
                           <td className="p-4">
                             <div className={`px-2 py-1 border rounded-lg text-[10px] font-bold uppercase tracking-wide inline-block ${
-                                !s.estadoPalpacion || s.estadoPalpacion === 'Por Confirmar' ? 'bg-slate-50 border-slate-200 text-slate-500' :
-                                s.estadoPalpacion === 'Gestante' ? 'bg-green-50 border-green-200 text-green-600' :
+                                !estadoReproductivo?.ultimoDiagnostico ? 'bg-slate-50 border-slate-200 text-slate-500' :
+                                estadoReproductivo?.ultimoDiagnostico?.resultado === 'Preñada' ? 'bg-green-50 border-green-200 text-green-600' :
                                 'bg-red-50 border-red-200 text-red-600'
                               }`}>
-                              {s.estadoPalpacion || 'Por Confirmar'}
+                              {estadoReproductivo?.ultimoDiagnostico?.resultado || 'Por Confirmar'}
                             </div>
                           </td>
                           <td className="p-4 pr-6 sm:pr-8 text-slate-400 truncate max-w-[150px]">{s.observaciones || '-'}</td>
                         </tr>
                       );
                     })}
-                    {(!(Array.isArray(estadoReproductivo) ? estadoReproductivo : estadoReproductivo?.servicios) || (Array.isArray(estadoReproductivo) ? estadoReproductivo : estadoReproductivo?.servicios).length === 0) && (
+                    {!estadoReproductivo?.servicioActivo && (
                       <tr>
                         <td colSpan={9} className="p-8 text-center text-slate-400">
                           No hay servicios registrados
