@@ -70,6 +70,7 @@ const proximosEventosMock: ProximoEventoReproductivo[] = [
     tipo: "Palpación",
     fecha: fechaEnDias(4),
     diasRestantes: 4,
+    urgente: false,
   },
   {
     animalId: "a1",
@@ -78,6 +79,7 @@ const proximosEventosMock: ProximoEventoReproductivo[] = [
     tipo: "Parto",
     fecha: fechaEnDias(11),
     diasRestantes: 11,
+    urgente: false,
   },
   {
     animalId: "a3",
@@ -86,6 +88,7 @@ const proximosEventosMock: ProximoEventoReproductivo[] = [
     tipo: "Parto",
     fecha: fechaEnDias(27),
     diasRestantes: 27,
+    urgente: false,
   },
 ];
 

@@ -101,6 +101,9 @@ export const getPesajesByAnimal = async (animalId: string): Promise<any[]> => {
   return fetchApi(`/pesajes/animal/${animalId}`);
 };
 
+// Versión tipada (sin `any`) en lib/api/reproductivo.ts, consumida por los
+// hooks de la pestaña Reproductivo. Esta se deja tal cual para no romper el
+// PDF de la ficha, que sigue usándola.
 export const getEstadoReproductivo = async (animalId: string): Promise<any> => {
   return fetchApi(`/animales/${animalId}/estado-reproductivo`);
 };

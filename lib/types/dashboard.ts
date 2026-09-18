@@ -28,8 +28,20 @@ export interface AnimalEnRetiro {
   diasRestantesCarne: number | null;
 }
 
-/** Tipo de hito del calendario reproductivo. */
-export type TipoEventoReproductivo = "Palpación" | "Parto";
+/**
+ * Tipo de hito del calendario reproductivo.
+ *
+ * Corregido contra el contrato real de GET /reproductivo/proximos-eventos
+ * (backend/src/reproductivo/dto/responses/estado-reproductivo.response.dto.ts):
+ * son 5 valores, no 2. "Aviso Parto" es FPP-15 y "Aviso Parto Urgente" es
+ * FPP-3 — dos alertas separadas a propósito.
+ */
+export type TipoEventoReproductivo =
+  | "Palpación"
+  | "Secado"
+  | "Aviso Parto"
+  | "Aviso Parto Urgente"
+  | "Parto";
 
 /** Fila del feed "Calendario Reproductivo". */
 export interface ProximoEventoReproductivo {
@@ -39,6 +51,8 @@ export interface ProximoEventoReproductivo {
   tipo: TipoEventoReproductivo;
   fecha: string;
   diasRestantes: number;
+  /** true solo en el aviso de FPP - 3 días. */
+  urgente: boolean;
 }
 
 export type CategoriaAlerta = "retiro" | "palpacion" | "parto";

@@ -31,7 +31,7 @@ export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
   const navItems = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Hato Ganadero', href: '/hato', icon: Users },
-    { name: 'Reproducción', href: '#', icon: Clock },
+    { name: 'Reproducción', href: '/reproductivo', icon: Clock },
     { name: 'Producción Lechera', href: '#', icon: FileText },
     { name: 'Reportes', href: '#', icon: ClipboardList },
     { name: 'Módulo de Potreros', href: '/potreros', icon: Map },
