@@ -7,7 +7,25 @@ import autoTable from 'jspdf-autotable';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getAnimal, createPesaje, createServicio, createTratamiento, updateTratamiento, getPesajesByAnimal, getServiciosByAnimal, getTratamientosByAnimal, updateServicio, updateAnimal, getDocumentos, createDocumento } from '@/lib/api/animales';
+import {
+  getAnimal,
+  createPesaje,
+  createTratamiento,
+  updateTratamiento,
+  getPesajesByAnimal,
+  getTratamientosByAnimal,
+  updateAnimal,
+  getDocumentos,
+  createDocumento,
+  getEstadoReproductivo,
+  createServicioReproductivo,
+  createDiagnosticoReproductivo,
+} from '@/lib/api/animales';
+import {
+  calcularFechaLiberacion,
+  diasRestantesRetiro,
+  formatearFecha,
+} from '@/lib/api/sanitary';
 import { createClient } from '@/lib/supabase/client';
 import { BUCKET_ANIMAL_DOCS } from '@/lib/supabase/buckets';
 import {
@@ -379,8 +397,13 @@ export default function ExpedienteAnimal() {
   }
 
   // Cálculo de retiros sanitarios activos (leche y carne) según MOD-02 y Patron-Evento-Estado-Alerta
-  let retiroLecheActivo: { fechaLiberacion: string; diasRestantes: number; farmaco: string } | null = null;
-  let retiroCarneActivo: { fechaLiberacion: string; diasRestantes: number; farmaco: string } | null = null;
+  interface RetiroDetalle {
+    fechaLiberacion: string;
+    diasRestantes: number;
+    farmaco: string;
+  }
+  let retiroLecheActivo: RetiroDetalle | null = null;
+  let retiroCarneActivo: RetiroDetalle | null = null;
 
   tratamientos?.forEach((t: any) => {
     const dLeche = t.diasRetiroLeche ?? t.diasRetiro ?? 0;
@@ -407,10 +430,11 @@ export default function ExpedienteAnimal() {
     }
   });
 
-  const alertaRetiro = (retiroLecheActivo || retiroCarneActivo) ? {
-    leche: retiroLecheActivo,
-    carne: retiroCarneActivo,
-  } : null;
+  const alertaRetiro: { leche: RetiroDetalle | null; carne: RetiroDetalle | null } | null =
+    (retiroLecheActivo || retiroCarneActivo) ? {
+      leche: retiroLecheActivo,
+      carne: retiroCarneActivo,
+    } : null;
 
 
   return (

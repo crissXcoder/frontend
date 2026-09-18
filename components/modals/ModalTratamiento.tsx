@@ -4,6 +4,15 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { X, Upload, Link as LinkIcon, Loader2, AlertTriangle, Sparkles } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import {
+  getMedicamentos,
+  getPadecimientos,
+  calcularFechaLiberacion,
+  formatearFecha,
+  type Medicamento,
+  type Padecimiento,
+} from '@/lib/api/sanitary';
+import { BUCKET_DOCUMENTOS } from '@/lib/supabase/buckets';
 
 interface ModalTratamientoProps {
   isOpen: boolean;
@@ -39,14 +48,14 @@ export default function ModalTratamiento({
   const [isUploading, setIsUploading] = useState(false);
 
   // Carga reactiva de catálogos desde el backend
-  const { data: medicamentos = [], isLoading: loadingMedicamentos } = useQuery({
+  const { data: medicamentos = [], isLoading: loadingMedicamentos } = useQuery<Medicamento[]>({
     queryKey: ['catalogos', 'medicamentos'],
     queryFn: getMedicamentos,
     staleTime: 1000 * 60 * 30, // 30 minutos
     enabled: isOpen,
   });
 
-  const { data: padecimientos = [], isLoading: loadingPadecimientos } = useQuery({
+  const { data: padecimientos = [], isLoading: loadingPadecimientos } = useQuery<Padecimiento[]>({
     queryKey: ['catalogos', 'padecimientos'],
     queryFn: getPadecimientos,
     staleTime: 1000 * 60 * 30,
@@ -175,7 +184,7 @@ export default function ModalTratamiento({
         if (uploadError) throw uploadError;
 
         const { data: { publicUrl } } = supabase.storage
-          .from('documentos')
+          .from(BUCKET_DOCUMENTOS)
           .getPublicUrl(filePath);
 
         finalDocumentoUrl = publicUrl;
