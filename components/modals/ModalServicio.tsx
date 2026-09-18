@@ -110,37 +110,7 @@ export default function ModalServicio({ isOpen, onClose, onSubmit, animalSexo }:
             </div>
           </div>
 
-          {formData.fecha && (
-            <div className="bg-info-bg border border-info/30 rounded-xl p-4 mt-2">
-              <h3 className="text-xs font-bold text-navy uppercase tracking-wide mb-3">Hitos Calculados Automáticamente</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-white rounded-lg p-2.5 text-center border border-white/60 shadow-sm">
-                  <span className="block text-[10px] font-bold text-slate-400 uppercase">Palpación (Día 40)</span>
-                  <span className="block text-sm font-bold text-orange-500 mt-1">
-                    {new Date(new Date(formData.fecha).getTime() + 40 * 24 * 60 * 60 * 1000).toLocaleDateString()}
-                  </span>
-                </div>
-                <div className="bg-white rounded-lg p-2.5 text-center border border-white/60 shadow-sm">
-                  <span className="block text-[10px] font-bold text-slate-400 uppercase">Secado (Mes 7)</span>
-                  <span className="block text-sm font-bold text-purple-500 mt-1">
-                    {new Date(new Date(formData.fecha).getTime() + 210 * 24 * 60 * 60 * 1000).toLocaleDateString()}
-                  </span>
-                </div>
-                <div className="bg-white rounded-lg p-2.5 text-center border border-white/60 shadow-sm">
-                  <span className="block text-[10px] font-bold text-slate-400 uppercase">Aviso Parto (-15d)</span>
-                  <span className="block text-sm font-bold text-red-500 mt-1">
-                    {new Date(new Date(formData.fecha).getTime() + 268 * 24 * 60 * 60 * 1000).toLocaleDateString()}
-                  </span>
-                </div>
-                <div className="bg-white rounded-lg p-2.5 text-center border border-white/60 shadow-sm">
-                  <span className="block text-[10px] font-bold text-slate-400 uppercase">FPP (Día 283)</span>
-                  <span className="block text-sm font-bold text-green-500 mt-1">
-                    {new Date(new Date(formData.fecha).getTime() + 283 * 24 * 60 * 60 * 1000).toLocaleDateString()}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Hitos calculation removed as per user request (moved to backend) */}
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
             <button

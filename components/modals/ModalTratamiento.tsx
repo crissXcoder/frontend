@@ -4,14 +4,6 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { X, Upload, Link as LinkIcon, Loader2, AlertTriangle, Sparkles } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import {
-  getMedicamentos,
-  getPadecimientos,
-  calcularFechaLiberacion,
-  formatearFecha,
-  type Medicamento,
-  type Padecimiento,
-} from '@/lib/api/sanitary';
 
 interface ModalTratamientoProps {
   isOpen: boolean;
@@ -177,14 +169,14 @@ export default function ModalTratamiento({
         const filePath = `tratamientos/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
-          .from('documentos')
+          .from(BUCKET_DOCUMENTOS)
           .upload(filePath, file);
 
         if (uploadError) throw uploadError;
 
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from('documentos').getPublicUrl(filePath);
+        const { data: { publicUrl } } = supabase.storage
+          .from('documentos')
+          .getPublicUrl(filePath);
 
         finalDocumentoUrl = publicUrl;
       } catch (error) {

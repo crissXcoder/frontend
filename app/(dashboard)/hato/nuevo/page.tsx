@@ -3,10 +3,12 @@
 import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getRazas, getAnimales, createAnimal } from '@/lib/api/animales';
+import { getPotreros } from '@/lib/api/potreros';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { X, UploadCloud, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { BUCKET_ANIMALES_FOTOS } from '@/lib/supabase/buckets';
 
 export default function NuevoAnimalPage() {
   const router = useRouter();
@@ -26,7 +28,7 @@ export default function NuevoAnimalPage() {
     razaOtra: '',
     pesoActualKg: '',
     fechaNacimiento: '',
-    potrero: '',
+    potreroId: '',
     origen: 'Finca', // 'Finca' o 'Externa'
     padreId: '',
     madreId: '',
@@ -51,7 +53,10 @@ export default function NuevoAnimalPage() {
     queryFn: () => getAnimales(),
   });
 
-  const potreros = Array.from(new Set(animales.map(a => a.potrero).filter(Boolean))).sort() as string[];
+  const { data: potreros = [] } = useQuery({
+    queryKey: ['potreros'],
+    queryFn: () => getPotreros(),
+  });
 
   const createMutation = useMutation({
     mutationFn: createAnimal,
@@ -90,7 +95,7 @@ export default function NuevoAnimalPage() {
         const filePath = `${fileName}`;
 
         const { error: uploadError } = await supabase.storage
-          .from('animales-fotos')
+          .from(BUCKET_ANIMALES_FOTOS)
           .upload(filePath, file);
 
         if (uploadError) {
@@ -98,7 +103,7 @@ export default function NuevoAnimalPage() {
         }
 
         const { data } = supabase.storage
-          .from('animales-fotos')
+          .from(BUCKET_ANIMALES_FOTOS)
           .getPublicUrl(filePath);
           
         uploadedFotoUrl = data.publicUrl;
@@ -122,12 +127,39 @@ export default function NuevoAnimalPage() {
       if (refs.length > 0) refFinal = refs.join(' | ');
     }
 
-    createMutation.mutate({
+    const payload: any = {
       ...formData,
-      referenciaPago: refFinal,
-      fotoUrl: uploadedFotoUrl,
+      referenciaPago: refFinal || undefined,
+      fotoUrl: uploadedFotoUrl || undefined,
       activo: true,
-    });
+    };
+
+    delete payload.referenciaSinpe;
+    delete payload.referenciaDeposito;
+
+    // Convert numeric fields and clear empty strings
+    if (payload.pesoActualKg) payload.pesoActualKg = Number(payload.pesoActualKg);
+    else delete payload.pesoActualKg;
+
+    if (payload.valorCompraCrc) payload.valorCompraCrc = Number(payload.valorCompraCrc);
+    else delete payload.valorCompraCrc;
+
+    if (!payload.fechaCompra) delete payload.fechaCompra;
+    if (!payload.fechaNacimiento) delete payload.fechaNacimiento;
+    if (!payload.potreroId) delete payload.potreroId;
+    if (!payload.madreId) delete payload.madreId;
+    if (!payload.padreId) delete payload.padreId;
+    if (!payload.numeroOficialDiio) delete payload.numeroOficialDiio;
+    if (!payload.numeroGuia) delete payload.numeroGuia;
+    if (!payload.compradoA) delete payload.compradoA;
+    
+    if (payload.metodoCompra !== 'Combinado') {
+      delete payload.metodosCombinados;
+    }
+    if (!payload.metodoCompra) delete payload.metodoCompra;
+    if (!payload.razaOtra) delete payload.razaOtra;
+
+    createMutation.mutate(payload);
   };
 
   const isRazaOtra = razas.find(r => r.id === formData.razaId)?.nombre.toLowerCase() === 'otra';
@@ -341,20 +373,17 @@ export default function NuevoAnimalPage() {
 
               <div className="col-span-1 sm:col-span-2 space-y-1.5">
                 <label className="block text-sm font-semibold text-navy">Potrero</label>
-                <input
-                  type="text"
-                  name="potrero"
-                  value={formData.potrero}
+                <select
+                  name="potreroId"
+                  value={formData.potreroId}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-light bg-white"
-                  placeholder="Ej: Potrero 4"
-                  list="potreros-list"
-                />
-                <datalist id="potreros-list">
+                >
+                  <option value="">Sin Asignar</option>
                   {potreros.map(p => (
-                    <option key={p} value={p} />
+                    <option key={p.id} value={p.id}>{p.nombre}</option>
                   ))}
-                </datalist>
+                </select>
               </div>
             </div>
           </div>
