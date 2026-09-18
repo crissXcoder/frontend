@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   getEstadoReproductivoTipado,
   getHistorialReproductivo,
+  getProximosEventos,
   registrarDiagnosticoReproductivo,
   registrarPartoReproductivo,
   registrarSecadoReproductivo,
@@ -41,6 +42,18 @@ export function useHistorialReproductivo(animalId: string, habilitado = true) {
     queryKey: clavesReproductivo.historial(animalId),
     queryFn: () => getHistorialReproductivo(animalId),
     enabled: habilitado && Boolean(animalId),
+  });
+}
+
+/**
+ * Calendario reproductivo de toda la finca (pantalla /reproductivo). Misma
+ * clave que el feed del dashboard de Karla: las 4 mutations de esta pestaña
+ * la invalidan también, así que ambas pantallas se actualizan solas.
+ */
+export function useProximosEventosFinca(diasVentana?: number) {
+  return useQuery({
+    queryKey: clavesReproductivo.feed(),
+    queryFn: () => getProximosEventos(diasVentana),
   });
 }
 
