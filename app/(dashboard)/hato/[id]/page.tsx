@@ -9,6 +9,7 @@ import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getAnimal, createPesaje, createTratamiento, updateTratamiento, getPesajesByAnimal, getTratamientosByAnimal, updateAnimal, getDocumentos, createDocumento, getEstadoReproductivo, createServicioReproductivo, createDiagnosticoReproductivo } from '@/lib/api/animales';
 import { createClient } from '@/lib/supabase/client';
+import { BUCKET_ANIMAL_DOCS } from '@/lib/supabase/buckets';
 import { 
   ChevronLeft, 
   Plus, 
@@ -181,7 +182,7 @@ export default function ExpedienteAnimal() {
       const fileName = `${animalId}-${tipo.replace(/[^a-z0-9]/gi, '_').toLowerCase()}-${Date.now()}.${fileExt}`;
       
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('animal_docs')
+        .from(BUCKET_ANIMAL_DOCS)
         .upload(fileName, file);
 
       if (uploadError) {
@@ -190,7 +191,7 @@ export default function ExpedienteAnimal() {
 
       // Obtener URL pública
       const { data: { publicUrl } } = supabase.storage
-        .from('animal_docs')
+        .from(BUCKET_ANIMAL_DOCS)
         .getPublicUrl(fileName);
 
       // Guardar en la base de datos
