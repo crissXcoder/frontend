@@ -126,12 +126,39 @@ export default function NuevoAnimalPage() {
       if (refs.length > 0) refFinal = refs.join(' | ');
     }
 
-    createMutation.mutate({
+    const payload: any = {
       ...formData,
-      referenciaPago: refFinal,
-      fotoUrl: uploadedFotoUrl,
+      referenciaPago: refFinal || undefined,
+      fotoUrl: uploadedFotoUrl || undefined,
       activo: true,
-    });
+    };
+
+    delete payload.referenciaSinpe;
+    delete payload.referenciaDeposito;
+
+    // Convert numeric fields and clear empty strings
+    if (payload.pesoActualKg) payload.pesoActualKg = Number(payload.pesoActualKg);
+    else delete payload.pesoActualKg;
+
+    if (payload.valorCompraCrc) payload.valorCompraCrc = Number(payload.valorCompraCrc);
+    else delete payload.valorCompraCrc;
+
+    if (!payload.fechaCompra) delete payload.fechaCompra;
+    if (!payload.fechaNacimiento) delete payload.fechaNacimiento;
+    if (!payload.potreroId) delete payload.potreroId;
+    if (!payload.madreId) delete payload.madreId;
+    if (!payload.padreId) delete payload.padreId;
+    if (!payload.numeroOficialDiio) delete payload.numeroOficialDiio;
+    if (!payload.numeroGuia) delete payload.numeroGuia;
+    if (!payload.compradoA) delete payload.compradoA;
+    
+    if (payload.metodoCompra !== 'Combinado') {
+      delete payload.metodosCombinados;
+    }
+    if (!payload.metodoCompra) delete payload.metodoCompra;
+    if (!payload.razaOtra) delete payload.razaOtra;
+
+    createMutation.mutate(payload);
   };
 
   const isRazaOtra = razas.find(r => r.id === formData.razaId)?.nombre.toLowerCase() === 'otra';
