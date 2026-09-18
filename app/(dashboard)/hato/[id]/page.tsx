@@ -6,8 +6,8 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getAnimal, createPesaje, createServicio, createTratamiento, updateTratamiento, getPesajesByAnimal, getServiciosByAnimal, getTratamientosByAnimal, updateServicio, updateAnimal, getDocumentos, createDocumento } from '@/lib/api/animales';
+import { getAnimal, createPesaje, createServicio, updateTratamiento, getPesajesByAnimal, getServiciosByAnimal, updateServicio, updateAnimal, getDocumentos, createDocumento } from '@/lib/api/animales';
+import { getTratamientosByAnimal, createTratamiento, calcularFechaLiberacion, formatearFecha, diasRestantesRetiro } from '@/lib/api/sanitary';
 import { createClient } from '@/lib/supabase/client';
 import { 
   ChevronLeft, 
@@ -122,7 +122,6 @@ export default function ExpedienteAnimal() {
   const tratamientoMutation = useMutation({
     mutationFn: (data: any) => createTratamiento({ 
       ...data,
-      diasRetiro: data.dias_retiro ? parseInt(data.dias_retiro) : 0,
       animalId 
     }),
     onSuccess: () => {
@@ -133,10 +132,7 @@ export default function ExpedienteAnimal() {
   });
 
   const updateTratamientoMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string, data: any }) => updateTratamiento(id, {
-      ...data,
-      diasRetiro: data.dias_retiro ? parseInt(data.dias_retiro) : 0,
-    }),
+    mutationFn: ({ id, data }: { id: string, data: any }) => updateTratamiento(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tratamientos', animalId] });
       setIsTratamientoOpen(false);
@@ -367,34 +363,39 @@ export default function ExpedienteAnimal() {
     );
   }
 
-  // Buscamos si hay un retiro sanitario activo en los tratamientos reales
-  let alertaRetiro = null;
-  const tratamientoConRetiro = tratamientos?.find((t) => {
-    if (!t.diasRetiro || t.diasRetiro <= 0) return false;
-    const fechaAplicacion = new Date(t.fecha);
-    const fechaLiberacion = new Date(fechaAplicacion.getTime() + t.diasRetiro * 24 * 60 * 60 * 1000);
-    const hoy = new Date();
-    // Normalizar a inicio del día
-    hoy.setHours(0, 0, 0, 0);
-    fechaLiberacion.setHours(0, 0, 0, 0);
-    return hoy < fechaLiberacion;
+  // Cálculo de retiros sanitarios activos (leche y carne) según MOD-02 y Patron-Evento-Estado-Alerta
+  let retiroLecheActivo: { fechaLiberacion: string; diasRestantes: number; farmaco: string } | null = null;
+  let retiroCarneActivo: { fechaLiberacion: string; diasRestantes: number; farmaco: string } | null = null;
+
+  tratamientos?.forEach((t: any) => {
+    const dLeche = t.diasRetiroLeche ?? t.diasRetiro ?? 0;
+    const dCarne = t.diasRetiroCarne ?? t.diasRetiro ?? 0;
+
+    if (dLeche > 0 && t.fecha) {
+      const libLeche = calcularFechaLiberacion(t.fecha, dLeche);
+      const restLeche = diasRestantesRetiro(libLeche);
+      if (restLeche > 0) {
+        if (!retiroLecheActivo || restLeche > retiroLecheActivo.diasRestantes) {
+          retiroLecheActivo = { fechaLiberacion: libLeche, diasRestantes: restLeche, farmaco: t.farmaco };
+        }
+      }
+    }
+
+    if (dCarne > 0 && t.fecha) {
+      const libCarne = calcularFechaLiberacion(t.fecha, dCarne);
+      const restCarne = diasRestantesRetiro(libCarne);
+      if (restCarne > 0) {
+        if (!retiroCarneActivo || restCarne > retiroCarneActivo.diasRestantes) {
+          retiroCarneActivo = { fechaLiberacion: libCarne, diasRestantes: restCarne, farmaco: t.farmaco };
+        }
+      }
+    }
   });
 
-  if (tratamientoConRetiro) {
-    const fechaAplicacion = new Date(tratamientoConRetiro.fecha);
-    const fechaLiberacion = new Date(fechaAplicacion.getTime() + tratamientoConRetiro.diasRetiro * 24 * 60 * 60 * 1000);
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-    fechaLiberacion.setHours(0, 0, 0, 0);
-    const diasRestantes = Math.ceil((fechaLiberacion.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
-    
-    alertaRetiro = {
-      farmaco: tratamientoConRetiro.farmaco || 'Desconocido',
-      aplicado: fechaAplicacion.toLocaleDateString(),
-      liberacion: fechaLiberacion.toLocaleDateString(),
-      diasRestantes
-    };
-  }
+  const alertaRetiro = (retiroLecheActivo || retiroCarneActivo) ? {
+    leche: retiroLecheActivo,
+    carne: retiroCarneActivo,
+  } : null;
   
 
   return (
@@ -551,14 +552,30 @@ export default function ExpedienteAnimal() {
             <div className="space-y-6">
               
               {alertaRetiro && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-5 flex items-start gap-4 shadow-sm mb-6">
-                  <AlertTriangle className="w-6 h-6 text-red-600 shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <h3 className="text-sm font-extrabold text-red-700 tracking-wide">RETIRO SANITARIO ACTIVO</h3>
-                    <p className="text-sm font-medium text-red-600">
-                      Fármaco: <span className="font-bold">{alertaRetiro.farmaco}</span> · Aplicado: <span className="font-bold">{alertaRetiro.aplicado}</span> · Liberación: <span className="font-bold">{alertaRetiro.liberacion}</span> · Días restantes: <span className="font-bold">{alertaRetiro.diasRestantes}</span>
+                <div className="bg-danger-bg border border-danger/30 rounded-xl p-5 flex items-start gap-4 shadow-sm mb-6">
+                  <AlertTriangle className="w-6 h-6 text-danger shrink-0 mt-0.5" />
+                  <div className="space-y-1.5 flex-1">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-extrabold text-danger tracking-wide uppercase">
+                        Retiro Sanitario Activo
+                      </h3>
+                      <span className="text-xs font-bold text-danger bg-white/70 px-2.5 py-0.5 rounded-full border border-danger/20">
+                        Venta Restringida
+                      </span>
+                    </div>
+                    {alertaRetiro.leche && (
+                      <p className="text-sm font-medium text-danger">
+                        <strong>Retiro Leche:</strong> Hasta <span className="font-bold">{formatearFecha(alertaRetiro.leche.fechaLiberacion)}</span> ({alertaRetiro.leche.diasRestantes} días restantes) — Fármaco: <span className="font-bold">{alertaRetiro.leche.farmaco}</span>. <span className="text-[11px] font-bold uppercase tracking-wider bg-danger text-white px-1.5 py-0.5 rounded ml-1">Bloqueo de Ordeño</span>
+                      </p>
+                    )}
+                    {alertaRetiro.carne && (
+                      <p className="text-sm font-medium text-danger">
+                        <strong>Retiro Carne:</strong> Hasta <span className="font-bold">{formatearFecha(alertaRetiro.carne.fechaLiberacion)}</span> ({alertaRetiro.carne.diasRestantes} días restantes) — Fármaco: <span className="font-bold">{alertaRetiro.carne.farmaco}</span>
+                      </p>
+                    )}
+                    <p className="text-xs text-danger/80">
+                      Normativa SENASA / Costa Rica: No comercializar leche ni carne de animales en periodo de supresión farmacológica.
                     </p>
-                    <p className="text-[13px] text-red-500/80">⚠ Leche y/o carne no comercializable hasta la fecha de liberación.</p>
                   </div>
                 </div>
               )}
@@ -719,13 +736,21 @@ export default function ExpedienteAnimal() {
           
           {activeTab === 'sanitario' && (
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm mt-6 overflow-hidden">
-              <div className="p-6 sm:p-8 flex items-center justify-between border-b border-slate-100">
-                <h3 className="text-lg font-bold text-navy">Historial Sanitario</h3>
+              <div className="p-6 sm:p-8 flex items-center justify-between border-b border-slate-100 bg-surface">
+                <div>
+                  <h3 className="text-lg font-bold text-navy">Historial Sanitario y Tratamientos</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Registro cronológico de aplicaciones veterinarias y periodos de retiro oficial
+                  </p>
+                </div>
                 <button 
-                  onClick={() => setIsTratamientoOpen(true)}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-bold shadow-sm hover:bg-red-700 transition-colors"
+                  onClick={() => {
+                    setTratamientoSeleccionado(null);
+                    setIsTratamientoOpen(true);
+                  }}
+                  className="px-4 py-2 bg-danger text-white rounded-lg text-sm font-bold shadow-sm hover:bg-danger/90 transition-colors flex items-center gap-2"
                 >
-                  + Aplicar Tratamiento
+                  <Plus className="w-4 h-4" /> Aplicar Tratamiento
                 </button>
               </div>
               <div className="overflow-x-auto">
@@ -735,61 +760,109 @@ export default function ExpedienteAnimal() {
                       <th className="p-4 pl-6 sm:pl-8">Fecha</th>
                       <th className="p-4">Fármaco</th>
                       <th className="p-4">Diagnóstico</th>
-                      <th className="p-4">Dosis</th>
-                      <th className="p-4">Vía</th>
+                      <th className="p-4">Dosis / Vía</th>
                       <th className="p-4">Médico</th>
-                      <th className="p-4">{isMacho ? 'Días Retiro (Carne)' : 'Retiro Leche'}</th>
-                      <th className="p-4">Fecha Liberación</th>
+                      <th className="p-4">Retiro Leche</th>
+                      <th className="p-4">Retiro Carne</th>
+                      <th className="p-4">Estado</th>
                       <th className="p-4 pr-6 sm:pr-8 text-right">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm text-slate-600">
-                    {tratamientos?.map((t: any) => (
-                      <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="p-4 pl-6 sm:pl-8">{new Date(t.fecha).toLocaleDateString()}</td>
-                        <td className="p-4 font-bold text-navy">{t.farmaco}</td>
-                        <td className="p-4">{t.diagnostico}</td>
-                        <td className="p-4">{t.dosis}</td>
-                        <td className="p-4">{t.via}</td>
-                        <td className="p-4 text-sky-600">{t.veterinario || '-'}</td>
-                        <td className="p-4 font-bold text-red-600">{t.diasRetiro}d</td>
-                        <td className="p-4">
-                          {(() => {
-                            if (!t.diasRetiro) return '-';
-                            const date = new Date(t.fecha);
-                            date.setDate(date.getDate() + t.diasRetiro);
-                            return date.toLocaleDateString();
-                          })()}
-                        </td>
-                        <td className="p-4 pr-6 sm:pr-8 text-right space-x-3">
-                          {t.documentoUrl && (
-                            <a 
-                              href={t.documentoUrl} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-blue-500 hover:text-blue-700 transition-colors inline-block"
-                              title="Ver documento"
+                    {tratamientos?.map((t: any) => {
+                      const dLeche = t.diasRetiroLeche ?? t.diasRetiro ?? 0;
+                      const dCarne = t.diasRetiroCarne ?? t.diasRetiro ?? 0;
+                      const libLeche = t.fecha && dLeche > 0 ? calcularFechaLiberacion(t.fecha, dLeche) : null;
+                      const libCarne = t.fecha && dCarne > 0 ? calcularFechaLiberacion(t.fecha, dCarne) : null;
+                      const restLeche = libLeche ? diasRestantesRetiro(libLeche) : 0;
+                      const restCarne = libCarne ? diasRestantesRetiro(libCarne) : 0;
+                      const estaEnRetiro = restLeche > 0 || restCarne > 0;
+
+                      return (
+                        <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="p-4 pl-6 sm:pl-8 font-medium text-slate-700">
+                            {formatearFecha(t.fecha)}
+                          </td>
+                          <td className="p-4 font-bold text-navy">{t.farmaco}</td>
+                          <td className="p-4">{t.diagnostico}</td>
+                          <td className="p-4">
+                            <span className="font-medium text-slate-700">{t.dosis}</span>
+                            {t.via && <span className="text-xs text-slate-400 block">{t.via}</span>}
+                          </td>
+                          <td className="p-4 text-sky-700">{t.veterinario || '-'}</td>
+                          <td className="p-4">
+                            {dLeche > 0 ? (
+                              <div>
+                                <span className={`font-bold ${restLeche > 0 ? 'text-danger' : 'text-slate-600'}`}>
+                                  {dLeche}d
+                                </span>
+                                {libLeche && (
+                                  <span className="text-xs text-slate-400 block">
+                                    Lib: {formatearFecha(libLeche)}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">0d</span>
+                            )}
+                          </td>
+                          <td className="p-4">
+                            {dCarne > 0 ? (
+                              <div>
+                                <span className={`font-bold ${restCarne > 0 ? 'text-danger' : 'text-slate-600'}`}>
+                                  {dCarne}d
+                                </span>
+                                {libCarne && (
+                                  <span className="text-xs text-slate-400 block">
+                                    Lib: {formatearFecha(libCarne)}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">0d</span>
+                            )}
+                          </td>
+                          <td className="p-4">
+                            {estaEnRetiro ? (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-danger-bg text-danger border border-danger/30 uppercase tracking-wide">
+                                En Retiro
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-success-bg text-success border border-success/30 uppercase tracking-wide">
+                                Cumplido
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-4 pr-6 sm:pr-8 text-right space-x-3">
+                            {t.documentoUrl && (
+                              <a 
+                                href={t.documentoUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-info hover:text-navy transition-colors inline-block"
+                                title="Ver comprobante adjunto"
+                              >
+                                <FileText className="w-4 h-4" />
+                              </a>
+                            )}
+                            <button
+                              onClick={() => {
+                                setTratamientoSeleccionado(t);
+                                setIsTratamientoOpen(true);
+                              }}
+                              className="text-slate-400 hover:text-navy transition-colors inline-block"
+                              title="Editar tratamiento"
                             >
-                              <FileText className="w-4 h-4" />
-                            </a>
-                          )}
-                          <button
-                            onClick={() => {
-                              setTratamientoSeleccionado(t);
-                              setIsTratamientoOpen(true);
-                            }}
-                            className="text-slate-400 hover:text-blue-600 transition-colors inline-block"
-                            title="Editar tratamiento"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                     {(!tratamientos || tratamientos.length === 0) && (
                       <tr>
                         <td colSpan={9} className="p-8 text-center text-slate-400">
-                          No hay tratamientos registrados
+                          No hay tratamientos veterinarios registrados para este animal.
                         </td>
                       </tr>
                     )}
