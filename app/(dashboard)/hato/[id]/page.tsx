@@ -32,7 +32,9 @@ import ModalEditarOrigen from '@/components/modals/ModalEditarOrigen';
 import ModalDocumento from '@/components/modals/ModalDocumento';
 import { ModalEditarAnimal } from '@/components/modals/ModalEditarAnimal';
 import { ModalDarBaja } from '@/components/modals/ModalDarBaja';
-import { 
+import TabReproductivo from '@/components/reproductivo/TabReproductivo';
+import LineaTiempoGestacion from '@/components/reproductivo/LineaTiempoGestacion';
+import {
   LineChart, 
   Line, 
   XAxis, 
@@ -659,82 +661,7 @@ export default function ExpedienteAnimal() {
               </div>
 
               {/* Línea de Tiempo Gestación - Solo Hembras */}
-              {!isMacho && (
-                <div className="bg-white border border-slate-200 rounded-xl p-6 sm:p-8 shadow-sm">
-                  <h3 className="text-lg font-bold text-navy mb-8">Línea de Tiempo Gestación</h3>
-                  
-                  <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-slate-200">
-                  
-                  {/* Step 1 */}
-                  <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-slate-400 text-white font-bold shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
-                      <CheckCircle2 className="w-5 h-5" />
-                    </div>
-                    <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white border border-slate-200 p-4 rounded-xl shadow-sm flex justify-between items-center">
-                      <div>
-                        <div className="font-bold text-navy text-sm">Servicio</div>
-                        <div className="text-xs text-slate-500 mt-0.5">15/01/2026</div>
-                      </div>
-                      <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded">Confirmado</span>
-                    </div>
-                  </div>
-
-                  {/* Step 2 */}
-                  <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-orange-500 text-white font-bold shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
-                      <CheckCircle2 className="w-5 h-5" />
-                    </div>
-                    <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white border border-slate-200 p-4 rounded-xl shadow-sm flex justify-between items-center">
-                      <div>
-                        <div className="font-bold text-navy text-sm">Palpación (Día 40)</div>
-                        <div className="text-xs text-slate-500 mt-0.5">24/02/2026</div>
-                      </div>
-                      <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded">Confirmado</span>
-                    </div>
-                  </div>
-
-                  {/* Step 3 */}
-                  <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-slate-100 text-slate-400 font-bold shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
-                      3
-                    </div>
-                    <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-transparent p-4 flex justify-between items-center">
-                      <div>
-                        <div className="font-bold text-slate-600 text-sm">Secado (Mes 7)</div>
-                        <div className="text-xs text-slate-400 mt-0.5">01/09/2026</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Step 4 */}
-                  <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-slate-100 text-slate-400 font-bold shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
-                      4
-                    </div>
-                    <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-transparent p-4 flex justify-between items-center">
-                      <div>
-                        <div className="font-bold text-slate-600 text-sm">Aviso Parto (-15d)</div>
-                        <div className="text-xs text-slate-400 mt-0.5">30/09/2026</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Step 5 */}
-                  <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-slate-100 text-slate-400 font-bold shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
-                      5
-                    </div>
-                    <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-transparent p-4 flex justify-between items-center">
-                      <div>
-                        <div className="font-bold text-slate-600 text-sm">FPP</div>
-                        <div className="text-xs text-slate-400 mt-0.5">{estadoReproductivo?.servicioActivo?.fpp ? new Date(estadoReproductivo.servicioActivo.fpp).toLocaleDateString() : 'Pendiente de cálculo'}</div>
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-              )}
+              {!isMacho && <LineaTiempoGestacion estado={estadoReproductivo} />}
 
             </div>
           )}
@@ -822,103 +749,7 @@ export default function ExpedienteAnimal() {
           )}
 
           {activeTab === 'reproductivo' && (
-            <div className="bg-white border border-slate-200 rounded-xl shadow-sm mt-6 overflow-hidden">
-              <div className="p-6 sm:p-8 flex items-center justify-between border-b border-slate-100">
-                <h3 className="text-lg font-bold text-navy">Ciclo Reproductivo</h3>
-                <button 
-                  onClick={() => setIsServicioOpen(true)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-sm hover:bg-blue-700 transition-colors"
-                >
-                  + Registrar Servicio
-                </button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-400 uppercase tracking-wider">
-                      <th className="p-4 pl-6 sm:pl-8">Fecha</th>
-                      <th className="p-4">Tipo</th>
-                      <th className="p-4">Semental / Pajilla</th>
-                      <th className="p-4">Responsable</th>
-                      <th className="p-4">Potrero</th>
-                      <th className="p-4">FPP</th>
-                      <th className="p-4">Palpación</th>
-                      <th className="p-4">Estado Palp.</th>
-                      <th className="p-4 pr-6 sm:pr-8">Observaciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-sm text-slate-600">
-                    {(estadoReproductivo?.servicioActivo ? [estadoReproductivo.servicioActivo] : [])?.map((s: any) => {
-                      const fechaServicio = new Date(s.fechaEvento || s.fecha);
-                      // Usar la FPP retornada por MOD-03, o calcular fallback si falta
-                      const fppString = s.fpp || estadoReproductivo?.servicioActivo?.fpp;
-                      let fpp: Date | null;
-                      if (fppString) {
-                        fpp = new Date(fppString);
-                      } else if (animal.raza?.dias_gestacion) {
-                        fpp = new Date(fechaServicio);
-                        fpp.setDate(fpp.getDate() + animal.raza.dias_gestacion);
-                      } else {
-                        fpp = null;
-                      }
-                      
-                      const palpacionString = s.palpacionFecha || estadoReproductivo?.servicioActivo?.palpacionFecha;
-                      let palpacion: Date;
-                      if (palpacionString) {
-                        palpacion = new Date(palpacionString);
-                      } else {
-                        palpacion = new Date(fechaServicio);
-                        palpacion.setDate(palpacion.getDate() + 40);
-                      }
-
-                      return (
-                        <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="p-4 pl-6 sm:pl-8">{fechaServicio.toLocaleDateString()}</td>
-                          <td className="p-4">
-                            <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">{s.tipoServicio}</span>
-                          </td>
-                          <td className="p-4">{s.toroOPajilla || s.semental || '-'}</td>
-                          <td className="p-4 text-sky-600">{s.responsable || s.inseminador || '-'}</td>
-                          <td className="p-4">{s.potrero || '-'}</td>
-                          <td className="p-4 font-bold text-green-600">{fpp ? fpp.toLocaleDateString() : 'Pendiente'}</td>
-                          <td className="p-4 font-bold text-orange-500">
-                            {s.fechaPalpacion ? new Date(new Date(s.fechaPalpacion).getTime() + new Date().getTimezoneOffset() * 60000).toLocaleDateString() : palpacion.toLocaleDateString()}
-                          </td>
-                          <td className="p-4">
-                            {estadoReproductivo?.ultimoDiagnostico ? (
-                              <div className={`px-2 py-1 border rounded-lg text-[10px] font-bold uppercase tracking-wide inline-block ${
-                                  estadoReproductivo?.ultimoDiagnostico?.resultado === 'Preñada' ? 'bg-green-50 border-green-200 text-green-600' :
-                                  'bg-red-50 border-red-200 text-red-600'
-                                }`}>
-                                {estadoReproductivo?.ultimoDiagnostico?.resultado}
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => {
-                                  setDiagnosticoServicioId(s.eventoId || s.id);
-                                  setIsDiagnosticoOpen(true);
-                                }}
-                                className="px-2 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-600 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors"
-                              >
-                                Confirmar
-                              </button>
-                            )}
-                          </td>
-                          <td className="p-4 pr-6 sm:pr-8 text-slate-400 truncate max-w-[150px]">{s.notas || s.observaciones || '-'}</td>
-                        </tr>
-                      );
-                    })}
-                    {!estadoReproductivo?.servicioActivo && (
-                      <tr>
-                        <td colSpan={9} className="p-8 text-center text-slate-400">
-                          No hay servicios registrados
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <TabReproductivo animalId={animalId} sexo={animal.sexo} />
           )}
 
           {activeTab === 'produccion' && (
