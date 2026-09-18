@@ -7,7 +7,7 @@ import autoTable from 'jspdf-autotable';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getAnimal, createPesaje, createTratamiento, updateTratamiento, getPesajesByAnimal, getTratamientosByAnimal, updateAnimal, getDocumentos, createDocumento, getEstadoReproductivo, createServicioReproductivo } from '@/lib/api/animales';
+import { getAnimal, createPesaje, createTratamiento, updateTratamiento, getPesajesByAnimal, getTratamientosByAnimal, updateAnimal, getDocumentos, createDocumento, getEstadoReproductivo, createServicioReproductivo, createDiagnosticoReproductivo } from '@/lib/api/animales';
 import { createClient } from '@/lib/supabase/client';
 import { 
   ChevronLeft, 
@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import ModalPesaje from '@/components/modals/ModalPesaje';
 import ModalServicio from '@/components/modals/ModalServicio';
+import ModalDiagnostico from '@/components/modals/ModalDiagnostico';
 import ModalTratamiento from '@/components/modals/ModalTratamiento';
 import ModalEditarOrigen from '@/components/modals/ModalEditarOrigen';
 import ModalDocumento from '@/components/modals/ModalDocumento';
@@ -49,6 +50,8 @@ export default function ExpedienteAnimal() {
   // Modals state
   const [isPesajeOpen, setIsPesajeOpen] = useState(false);
   const [isServicioOpen, setIsServicioOpen] = useState(false);
+  const [isDiagnosticoOpen, setIsDiagnosticoOpen] = useState(false);
+  const [diagnosticoServicioId, setDiagnosticoServicioId] = useState('');
   const [isTratamientoOpen, setIsTratamientoOpen] = useState(false);
   const [tratamientoSeleccionado, setTratamientoSeleccionado] = useState<any | null>(null);
   const [isOrigenOpen, setIsOrigenOpen] = useState(false);
@@ -89,7 +92,7 @@ export default function ExpedienteAnimal() {
 
   const pesajeMutation = useMutation({
     mutationFn: (data: any) => createPesaje({ 
-      ...data, 
+      fecha: data.fecha,
       pesoActualKg: data.peso_actual ? parseFloat(data.peso_actual) : null,
       lecheMananaL: data.leche_manana ? parseFloat(data.leche_manana) : null,
       lecheTardeL: data.leche_tarde ? parseFloat(data.leche_tarde) : null,
@@ -102,12 +105,12 @@ export default function ExpedienteAnimal() {
   });
 
   const servicioMutation = useMutation({
-    mutationFn: (data: any) => createServicioReproductivo(animalId, { 
+    mutationFn: (data: any) => createServicioReproductivo(animalId, {
       fechaEvento: data.fecha,
       tipoServicio: data.tipo_servicio,
       toroOPajilla: data.semental,
       responsable: data.inseminador,
-      notas: data.observaciones
+      notas: data.observaciones ? `Potrero: ${data.potrero || 'N/A'} - ${data.observaciones}` : (data.potrero ? `Potrero: ${data.potrero}` : '')
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['estadoReproductivo', animalId] });
@@ -115,12 +118,23 @@ export default function ExpedienteAnimal() {
     }
   });
 
+  const diagnosticoMutation = useMutation({
+    mutationFn: (data: any) => createDiagnosticoReproductivo(animalId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['estadoReproductivo', animalId] });
+      setIsDiagnosticoOpen(false);
+    }
+  });
+
   const tratamientoMutation = useMutation({
-    mutationFn: (data: any) => createTratamiento({ 
-      ...data,
-      diasRetiro: data.dias_retiro ? parseInt(data.dias_retiro) : 0,
-      animalId 
-    }),
+    mutationFn: (data: any) => {
+      const { dias_retiro, ...rest } = data;
+      return createTratamiento({ 
+        ...rest,
+        diasRetiro: dias_retiro ? parseInt(dias_retiro) : 0,
+        animalId 
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tratamientos', animalId] });
       setIsTratamientoOpen(false);
@@ -129,10 +143,13 @@ export default function ExpedienteAnimal() {
   });
 
   const updateTratamientoMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string, data: any }) => updateTratamiento(id, {
-      ...data,
-      diasRetiro: data.dias_retiro ? parseInt(data.dias_retiro) : 0,
-    }),
+    mutationFn: ({ id, data }: { id: string, data: any }) => {
+      const { dias_retiro, ...rest } = data;
+      return updateTratamiento(id, {
+        ...rest,
+        diasRetiro: dias_retiro ? parseInt(dias_retiro) : 0,
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tratamientos', animalId] });
       setIsTratamientoOpen(false);
@@ -834,7 +851,7 @@ export default function ExpedienteAnimal() {
                       const fechaServicio = new Date(s.fechaEvento || s.fecha);
                       // Usar la FPP retornada por MOD-03, o calcular fallback si falta
                       const fppString = s.fpp || estadoReproductivo?.servicioActivo?.fpp;
-                      let fpp: Date;
+                      let fpp: Date | null;
                       if (fppString) {
                         fpp = new Date(fppString);
                       } else if (animal.raza?.dias_gestacion) {
@@ -859,23 +876,34 @@ export default function ExpedienteAnimal() {
                           <td className="p-4">
                             <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">{s.tipoServicio}</span>
                           </td>
-                          <td className="p-4">{s.semental || '-'}</td>
-                          <td className="p-4 text-sky-600">{s.inseminador || '-'}</td>
+                          <td className="p-4">{s.toroOPajilla || s.semental || '-'}</td>
+                          <td className="p-4 text-sky-600">{s.responsable || s.inseminador || '-'}</td>
                           <td className="p-4">{s.potrero || '-'}</td>
                           <td className="p-4 font-bold text-green-600">{fpp ? fpp.toLocaleDateString() : 'Pendiente'}</td>
                           <td className="p-4 font-bold text-orange-500">
                             {s.fechaPalpacion ? new Date(new Date(s.fechaPalpacion).getTime() + new Date().getTimezoneOffset() * 60000).toLocaleDateString() : palpacion.toLocaleDateString()}
                           </td>
                           <td className="p-4">
-                            <div className={`px-2 py-1 border rounded-lg text-[10px] font-bold uppercase tracking-wide inline-block ${
-                                !estadoReproductivo?.ultimoDiagnostico ? 'bg-slate-50 border-slate-200 text-slate-500' :
-                                estadoReproductivo?.ultimoDiagnostico?.resultado === 'Preñada' ? 'bg-green-50 border-green-200 text-green-600' :
-                                'bg-red-50 border-red-200 text-red-600'
-                              }`}>
-                              {estadoReproductivo?.ultimoDiagnostico?.resultado || 'Por Confirmar'}
-                            </div>
+                            {estadoReproductivo?.ultimoDiagnostico ? (
+                              <div className={`px-2 py-1 border rounded-lg text-[10px] font-bold uppercase tracking-wide inline-block ${
+                                  estadoReproductivo?.ultimoDiagnostico?.resultado === 'Preñada' ? 'bg-green-50 border-green-200 text-green-600' :
+                                  'bg-red-50 border-red-200 text-red-600'
+                                }`}>
+                                {estadoReproductivo?.ultimoDiagnostico?.resultado}
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setDiagnosticoServicioId(s.eventoId || s.id);
+                                  setIsDiagnosticoOpen(true);
+                                }}
+                                className="px-2 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-600 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors"
+                              >
+                                Confirmar
+                              </button>
+                            )}
                           </td>
-                          <td className="p-4 pr-6 sm:pr-8 text-slate-400 truncate max-w-[150px]">{s.observaciones || '-'}</td>
+                          <td className="p-4 pr-6 sm:pr-8 text-slate-400 truncate max-w-[150px]">{s.notas || s.observaciones || '-'}</td>
                         </tr>
                       );
                     })}
@@ -1055,6 +1083,12 @@ export default function ExpedienteAnimal() {
         isOpen={isServicioOpen} 
         onClose={() => setIsServicioOpen(false)} 
         onSubmit={(data) => servicioMutation.mutate(data)} 
+      />
+      <ModalDiagnostico
+        isOpen={isDiagnosticoOpen}
+        onClose={() => setIsDiagnosticoOpen(false)}
+        onSubmit={(data) => diagnosticoMutation.mutate(data)}
+        eventoServicioId={diagnosticoServicioId}
       />
       <ModalTratamiento 
         isOpen={isTratamientoOpen} 

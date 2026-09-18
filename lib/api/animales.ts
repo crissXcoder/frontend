@@ -129,3 +129,10 @@ export const updateTratamiento = async (id: string, data: any) => {
     body: JSON.stringify(data),
   });
 };
+
+export const createDiagnosticoReproductivo = async (animalId: string, data: any): Promise<any> => {
+  return fetchApi(`/animales/${animalId}/diagnosticos`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};

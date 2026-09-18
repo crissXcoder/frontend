@@ -23,8 +23,10 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => null);
-    console.error(`fetchApi error for ${endpoint}:`, { status: response.status, errorData, hasSession: !!session?.access_token });
+    const errorText = await response.text().catch(() => '');
+    let errorData = null;
+    try { errorData = JSON.parse(errorText); } catch(e) {}
+    console.error(`[fetchApi] Error en ${endpoint} | Status: ${response.status} | Body: ${errorText}`);
     throw new Error(errorData?.message || `API Error: ${response.status} ${response.statusText}`);
   }
 
