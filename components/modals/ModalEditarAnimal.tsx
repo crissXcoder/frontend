@@ -3,6 +3,7 @@ import { X, Loader2 } from 'lucide-react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { getCatalogosRazas } from '@/lib/api/catalogos';
 import { updateAnimal, getAnimales } from '@/lib/api/animales';
+import { getPotreros } from '@/lib/api/potreros';
 
 interface ModalEditarAnimalProps {
   isOpen: boolean;
@@ -19,7 +20,7 @@ export function ModalEditarAnimal({ isOpen, onClose, animal }: ModalEditarAnimal
     razaOtra: '',
     categoria: '',
     pesoActualKg: '',
-    potrero: '',
+    potreroId: '',
   });
 
   const { data: razas = [] } = useQuery({
@@ -34,7 +35,11 @@ export function ModalEditarAnimal({ isOpen, onClose, animal }: ModalEditarAnimal
     enabled: isOpen,
   });
 
-  const potreros = Array.from(new Set(animales.map(a => a.potrero).filter(Boolean))).sort() as string[];
+  const { data: potreros = [] } = useQuery({
+    queryKey: ['potreros'],
+    queryFn: () => getPotreros(),
+    enabled: isOpen,
+  });
 
   useEffect(() => {
     if (animal && isOpen) {
@@ -44,7 +49,7 @@ export function ModalEditarAnimal({ isOpen, onClose, animal }: ModalEditarAnimal
         razaOtra: animal.razaOtra || '',
         categoria: animal.categoria || '',
         pesoActualKg: animal.pesoActualKg || '',
-        potrero: animal.potrero || '',
+        potreroId: animal.potreroId || '',
       });
     }
   }, [animal, isOpen]);
@@ -83,7 +88,7 @@ export function ModalEditarAnimal({ isOpen, onClose, animal }: ModalEditarAnimal
       razaOtra: formData.razaOtra,
       categoria: formData.categoria,
       pesoActualKg: formData.pesoActualKg ? Number(formData.pesoActualKg) : null,
-      potrero: formData.potrero,
+      potreroId: formData.potreroId,
     });
   };
 
@@ -204,19 +209,16 @@ export function ModalEditarAnimal({ isOpen, onClose, animal }: ModalEditarAnimal
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                 Potrero
               </label>
-              <input
-                type="text"
-                value={formData.potrero}
-                onChange={(e) => setFormData({ ...formData, potrero: e.target.value })}
+              <select
+                value={formData.potreroId}
+                onChange={(e) => setFormData({ ...formData, potreroId: e.target.value })}
                 className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy-light focus:border-transparent text-slate-700"
-                placeholder="Potrero #4"
-                list="potreros-list"
-              />
-              <datalist id="potreros-list">
+              >
+                <option value="">Sin Asignar</option>
                 {potreros.map(p => (
-                  <option key={p} value={p} />
+                  <option key={p.id} value={p.id}>{p.nombre}</option>
                 ))}
-              </datalist>
+              </select>
             </div>
           </div>
 

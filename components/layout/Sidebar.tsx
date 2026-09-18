@@ -34,7 +34,7 @@ export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
     { name: 'Reproducción', href: '#', icon: Clock },
     { name: 'Producción Lechera', href: '#', icon: FileText },
     { name: 'Reportes', href: '#', icon: ClipboardList },
-    { name: 'Módulo de Potreros', href: '#', icon: Map },
+    { name: 'Módulo de Potreros', href: '/potreros', icon: Map },
     { name: 'Escáner QR / Arete', href: '#', icon: QrCode },
   ];
 

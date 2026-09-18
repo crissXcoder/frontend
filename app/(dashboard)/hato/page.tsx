@@ -194,7 +194,7 @@ export default function HatoPage() {
                         <StatusBadge status={animal.activo ? 'Apto' : (animal.tipoBaja || 'Inactivo')} />
                       </td>
                       <td className="px-6 py-4 text-slate-600 text-xs">
-                        {animal.potrero || 'Potrero #1'}
+                        {animal.potrero?.nombre || 'Potrero #1'}
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">

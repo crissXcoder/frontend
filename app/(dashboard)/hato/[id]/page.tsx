@@ -7,7 +7,7 @@ import autoTable from 'jspdf-autotable';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getAnimal, createPesaje, createServicio, createTratamiento, updateTratamiento, getPesajesByAnimal, getServiciosByAnimal, getTratamientosByAnimal, updateServicio, updateAnimal, getDocumentos, createDocumento } from '@/lib/api/animales';
+import { getAnimal, createPesaje, createTratamiento, updateTratamiento, getPesajesByAnimal, getTratamientosByAnimal, updateAnimal, getDocumentos, createDocumento, getEstadoReproductivo, createServicioReproductivo } from '@/lib/api/animales';
 import { createClient } from '@/lib/supabase/client';
 import { 
   ChevronLeft, 
@@ -20,7 +20,8 @@ import {
   Pencil,
   CheckCircle2,
   Loader2,
-  FileText
+  FileText,
+  Camera
 } from 'lucide-react';
 import ModalPesaje from '@/components/modals/ModalPesaje';
 import ModalServicio from '@/components/modals/ModalServicio';
@@ -71,9 +72,9 @@ export default function ExpedienteAnimal() {
     queryFn: () => getPesajesByAnimal(animalId),
   });
 
-  const { data: servicios } = useQuery({
-    queryKey: ['servicios', animalId],
-    queryFn: () => getServiciosByAnimal(animalId),
+  const { data: estadoReproductivo } = useQuery({
+    queryKey: ['estadoReproductivo', animalId],
+    queryFn: () => getEstadoReproductivo(animalId),
   });
 
   const { data: tratamientos } = useQuery({
@@ -101,21 +102,16 @@ export default function ExpedienteAnimal() {
   });
 
   const servicioMutation = useMutation({
-    mutationFn: (data: any) => createServicio({ 
-      ...data,
+    mutationFn: (data: any) => createServicioReproductivo(animalId, { 
+      fechaEvento: data.fecha,
       tipoServicio: data.tipo_servicio,
-      animalId 
+      toroOPajilla: data.semental,
+      responsable: data.inseminador,
+      notas: data.observaciones
     }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['servicios', animalId] });
+      queryClient.invalidateQueries({ queryKey: ['estadoReproductivo', animalId] });
       setIsServicioOpen(false);
-    }
-  });
-
-  const updateServicioMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string, data: any }) => updateServicio(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['servicios', animalId] });
     }
   });
 
@@ -217,7 +213,7 @@ export default function ExpedienteAnimal() {
     yPos += 8;
     
     doc.text(`Peso Actual: ${animal.pesoActualKg || 0} kg`, 14, yPos);
-    doc.text(`Potrero: ${animal.potrero || 'N/A'}`, 80, yPos);
+    doc.text(`Potrero: ${animal.potrero?.nombre || 'N/A'}`, 80, yPos);
     if (animal.fechaNacimiento) {
       doc.text(`Fecha Nac.: ${new Date(animal.fechaNacimiento).toLocaleDateString()}`, 150, yPos);
     }
@@ -298,7 +294,8 @@ export default function ExpedienteAnimal() {
     }
 
     // Sección: Reproductivo
-    if (servicios && servicios.length > 0) {
+    const serviciosActivos = estadoReproductivo?.servicioActivo ? [estadoReproductivo.servicioActivo] : [];
+    if (serviciosActivos.length > 0) {
       if (yPos > 250) { doc.addPage(); yPos = 20; }
       
       doc.setFontSize(14);
@@ -306,12 +303,12 @@ export default function ExpedienteAnimal() {
       doc.text('Historial Reproductivo', 14, yPos);
       yPos += 5;
       
-      const tableData = servicios.map((s: any) => {
+      const tableData = serviciosActivos.map((s: any) => {
         return [
-          s.fecha ? new Date(s.fecha).toLocaleDateString() : '-',
+          s.fechaEvento || s.fecha ? new Date(s.fechaEvento || s.fecha).toLocaleDateString() : '-',
           s.tipoServicio || '-',
-          s.semental || '-',
-          s.estadoPalpacion || 'Pendiente'
+          s.toroOPajilla || s.semental || '-',
+          estadoReproductivo?.ultimoDiagnostico?.resultado || 'Pendiente'
         ];
       });
 
@@ -433,11 +430,18 @@ export default function ExpedienteAnimal() {
             {/* Info Animal */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
               <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl bg-slate-100 overflow-hidden border border-slate-200 shadow-sm relative shrink-0">
-                <img
-                  src={animal.fotoUrl || "https://images.unsplash.com/photo-1570042225831-d98fa7577f1e?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80"}
-                  alt={animal.nombre}
-                  className="w-full h-full object-cover"
-                />
+                {animal.fotoUrl ? (
+                  <img
+                    src={animal.fotoUrl}
+                    alt={`Vaca ${animal.areteInterno}`}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-slate-100 text-slate-400 gap-2">
+                    <Camera size={32} />
+                    <span className="text-sm font-bold">Sin foto</span>
+                  </div>
+                )}
                 <div className={`absolute bottom-2 right-2 w-6 h-6 text-white rounded-full flex items-center justify-center border-2 border-white text-xs font-bold shadow-sm ${animal.sexo === 'Hembra' ? 'bg-pink-500' : 'bg-blue-500'}`}>
                   {animal.sexo === 'Hembra' ? 'H' : 'M'}
                 </div>
@@ -462,7 +466,7 @@ export default function ExpedienteAnimal() {
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-slate-600">
                   <p><span className="font-bold text-navy">{animal.pesoActualKg || 0} kg</span> <span className="text-slate-400">— Peso actual</span></p>
                   <p className="font-semibold">{animal.categoria || 'Sin Categoría'}</p>
-                  <p className="font-semibold">{animal.potrero || 'Sin Potrero'}</p>
+                  <p className="font-semibold">{animal.potrero?.nombre || 'Sin Potrero'}</p>
                   {animal.fechaNacimiento && (
                     <p>{new Date(animal.fechaNacimiento).toLocaleDateString()}</p>
                   )}
@@ -704,8 +708,8 @@ export default function ExpedienteAnimal() {
                     </div>
                     <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-transparent p-4 flex justify-between items-center">
                       <div>
-                        <div className="font-bold text-slate-600 text-sm">FPP (Día {animal?.raza?.dias_gestacion || 280})</div>
-                        <div className="text-xs text-slate-400 mt-0.5">15/10/2026</div>
+                        <div className="font-bold text-slate-600 text-sm">FPP</div>
+                        <div className="text-xs text-slate-400 mt-0.5">{estadoReproductivo?.servicioActivo?.fpp ? new Date(estadoReproductivo.servicioActivo.fpp).toLocaleDateString() : 'Pendiente de cálculo'}</div>
                       </div>
                     </div>
                   </div>
@@ -826,13 +830,28 @@ export default function ExpedienteAnimal() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm text-slate-600">
-                    {servicios?.map((s: any) => {
-                      const fechaServicio = new Date(s.fecha);
-                      const fpp = new Date(fechaServicio);
-                      fpp.setDate(fpp.getDate() + 283);
-                      const fechaParto = new Date(fechaServicio.getTime() + (animal.raza?.dias_gestacion || 283) * 24 * 60 * 60 * 1000);
-                      const palpacion = new Date(fechaServicio);
-                      palpacion.setDate(palpacion.getDate() + 40);
+                    {(estadoReproductivo?.servicioActivo ? [estadoReproductivo.servicioActivo] : [])?.map((s: any) => {
+                      const fechaServicio = new Date(s.fechaEvento || s.fecha);
+                      // Usar la FPP retornada por MOD-03, o calcular fallback si falta
+                      const fppString = s.fpp || estadoReproductivo?.servicioActivo?.fpp;
+                      let fpp: Date;
+                      if (fppString) {
+                        fpp = new Date(fppString);
+                      } else if (animal.raza?.dias_gestacion) {
+                        fpp = new Date(fechaServicio);
+                        fpp.setDate(fpp.getDate() + animal.raza.dias_gestacion);
+                      } else {
+                        fpp = null;
+                      }
+                      
+                      const palpacionString = s.palpacionFecha || estadoReproductivo?.servicioActivo?.palpacionFecha;
+                      let palpacion: Date;
+                      if (palpacionString) {
+                        palpacion = new Date(palpacionString);
+                      } else {
+                        palpacion = new Date(fechaServicio);
+                        palpacion.setDate(palpacion.getDate() + 40);
+                      }
 
                       return (
                         <tr key={s.id} className="hover:bg-slate-50 transition-colors">
@@ -843,37 +862,24 @@ export default function ExpedienteAnimal() {
                           <td className="p-4">{s.semental || '-'}</td>
                           <td className="p-4 text-sky-600">{s.inseminador || '-'}</td>
                           <td className="p-4">{s.potrero || '-'}</td>
-                          <td className="p-4 font-bold text-green-600">{fpp.toLocaleDateString()}</td>
+                          <td className="p-4 font-bold text-green-600">{fpp ? fpp.toLocaleDateString() : 'Pendiente'}</td>
                           <td className="p-4 font-bold text-orange-500">
                             {s.fechaPalpacion ? new Date(new Date(s.fechaPalpacion).getTime() + new Date().getTimezoneOffset() * 60000).toLocaleDateString() : palpacion.toLocaleDateString()}
                           </td>
                           <td className="p-4">
-                            <select
-                              className={`px-2 py-1 border rounded-lg text-[10px] font-bold uppercase tracking-wide cursor-pointer focus:outline-none focus:ring-2 focus:ring-navy-light ${
-                                !s.estadoPalpacion || s.estadoPalpacion === 'Por Confirmar' ? 'bg-slate-50 border-slate-200 text-slate-500' :
-                                s.estadoPalpacion === 'Gestante' ? 'bg-green-50 border-green-200 text-green-600' :
+                            <div className={`px-2 py-1 border rounded-lg text-[10px] font-bold uppercase tracking-wide inline-block ${
+                                !estadoReproductivo?.ultimoDiagnostico ? 'bg-slate-50 border-slate-200 text-slate-500' :
+                                estadoReproductivo?.ultimoDiagnostico?.resultado === 'Preñada' ? 'bg-green-50 border-green-200 text-green-600' :
                                 'bg-red-50 border-red-200 text-red-600'
-                              }`}
-                              value={s.estadoPalpacion || 'Por Confirmar'}
-                              onChange={(e) => updateServicioMutation.mutate({ 
-                                id: s.id, 
-                                data: { 
-                                  estadoPalpacion: e.target.value,
-                                  fechaPalpacion: e.target.value !== 'Por Confirmar' ? new Date().toISOString().split('T')[0] : null
-                                } 
-                              })}
-                              disabled={updateServicioMutation.isPending}
-                            >
-                              <option value="Por Confirmar">Por Confirmar</option>
-                              <option value="Gestante">Gestante (+)</option>
-                              <option value="Vacía">Vacía (-)</option>
-                            </select>
+                              }`}>
+                              {estadoReproductivo?.ultimoDiagnostico?.resultado || 'Por Confirmar'}
+                            </div>
                           </td>
                           <td className="p-4 pr-6 sm:pr-8 text-slate-400 truncate max-w-[150px]">{s.observaciones || '-'}</td>
                         </tr>
                       );
                     })}
-                    {(!servicios || servicios.length === 0) && (
+                    {!estadoReproductivo?.servicioActivo && (
                       <tr>
                         <td colSpan={9} className="p-8 text-center text-slate-400">
                           No hay servicios registrados
