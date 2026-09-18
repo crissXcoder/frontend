@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { X, UploadCloud, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { BUCKET_ANIMALES_FOTOS } from '@/lib/supabase/buckets';
 
 export default function NuevoAnimalPage() {
   const router = useRouter();
@@ -94,7 +95,7 @@ export default function NuevoAnimalPage() {
         const filePath = `${fileName}`;
 
         const { error: uploadError } = await supabase.storage
-          .from('animales-fotos')
+          .from(BUCKET_ANIMALES_FOTOS)
           .upload(filePath, file);
 
         if (uploadError) {
@@ -102,7 +103,7 @@ export default function NuevoAnimalPage() {
         }
 
         const { data } = supabase.storage
-          .from('animales-fotos')
+          .from(BUCKET_ANIMALES_FOTOS)
           .getPublicUrl(filePath);
           
         uploadedFotoUrl = data.publicUrl;

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Upload, Link as LinkIcon, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { BUCKET_DOCUMENTOS } from '@/lib/supabase/buckets';
 
 interface ModalTratamientoProps {
   isOpen: boolean;
@@ -87,13 +88,13 @@ export default function ModalTratamiento({ isOpen, onClose, onSubmit, initialDat
         const filePath = `tratamientos/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
-          .from('documentos')
+          .from(BUCKET_DOCUMENTOS)
           .upload(filePath, file);
 
         if (uploadError) throw uploadError;
 
         const { data: { publicUrl } } = supabase.storage
-          .from('documentos')
+          .from(BUCKET_DOCUMENTOS)
           .getPublicUrl(filePath);
 
         finalDocumentoUrl = publicUrl;
