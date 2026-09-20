@@ -55,7 +55,12 @@ export interface ProximoEventoReproductivo {
   urgente: boolean;
 }
 
-export type CategoriaAlerta = "retiro" | "palpacion" | "parto";
+export type CategoriaAlerta =
+  | "retiro"
+  | "palpacion"
+  | "secado"
+  | "parto"
+  | "parto_urgente";
 
 /** Ítem de la campana de notificaciones. */
 export interface AlertaNotificacion {

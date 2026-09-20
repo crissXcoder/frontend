@@ -19,6 +19,7 @@ import type {
   AlertaNotificacion,
   AnimalBusqueda,
   AnimalEnRetiro,
+  CategoriaAlerta,
   KpisDashboard,
   ProximoEventoReproductivo,
 } from "@/lib/types/dashboard";
@@ -146,13 +147,24 @@ export function getMockAlertas(): AlertaNotificacion[] {
   }));
 
   const alertasReproductivas: AlertaNotificacion[] = getMockProximosEventosReproductivos().map(
-    (e) => ({
-      id: `${e.tipo.toLowerCase()}-${e.animalId}`,
-      categoria: e.tipo === "Palpación" ? "palpacion" : "parto",
-      animalId: e.animalId,
-      fecha: e.fecha,
-      mensaje: `${e.nombre} (${e.arete}): ${e.tipo.toLowerCase()} en ${e.diasRestantes} día(s).`,
-    }),
+    (e) => {
+      let categoria: CategoriaAlerta = "parto";
+      if (e.tipo === "Palpación") {
+        categoria = "palpacion";
+      } else if (e.tipo === "Secado") {
+        categoria = "secado";
+      } else if (e.tipo === "Aviso Parto Urgente") {
+        categoria = "parto_urgente";
+      }
+
+      return {
+        id: `${e.tipo.toLowerCase().replace(/\s+/g, "-")}-${e.animalId}`,
+        categoria,
+        animalId: e.animalId,
+        fecha: e.fecha,
+        mensaje: `${e.nombre} (${e.arete}): ${e.tipo.toLowerCase()} en ${e.diasRestantes} día(s).`,
+      };
+    },
   );
 
   return [...alertasRetiro, ...alertasReproductivas].sort(

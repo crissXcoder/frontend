@@ -1,3 +1,4 @@
+import { AccionesRapidas } from "@/components/dashboard/acciones-rapidas";
 import { CalendarioReproductivo } from "@/components/dashboard/calendario-reproductivo";
 import { GlobalSearch } from "@/components/dashboard/global-search";
 import { KpiRow } from "@/components/dashboard/kpi-row";
@@ -32,10 +33,12 @@ export default function DashboardPage() {
 
       <KpiRow />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[3fr_2fr]">
         <SemaforoSanitario />
         <CalendarioReproductivo />
       </div>
+
+      <AccionesRapidas />
     </div>
   );
 }
