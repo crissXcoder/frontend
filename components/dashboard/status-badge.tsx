@@ -21,7 +21,7 @@ export type DashboardStatusVariant =
   | "parto"
   | "aviso-parto-urgente";
 
-const variantMap: Record<
+export const variantMap: Record<
   DashboardStatusVariant,
   "danger" | "warning" | "info" | "secado"
 > = {

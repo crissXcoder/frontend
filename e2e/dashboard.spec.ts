@@ -1,0 +1,205 @@
+import { test, expect } from '@playwright/test';
+
+/**
+ * Prueba E2E — MOD-04 Dashboard + Motor de Alertas (Karla)
+ *
+ * Flujo completo definido en la bitácora técnica de la bóveda (Karla-STATE.md):
+ * 1. Carga del Dashboard con renderizado de los 4 KPIs principales y widgets.
+ * 2. Interacción con la campana de alertas activas.
+ * 3. Sección de Acciones Rápidas:
+ *    - Click en "Registrar Tratamiento Médico" → apertura del selector modal de animales.
+ *    - Búsqueda reactiva de animal por nombre/arete.
+ *    - Selección del animal y apertura directa del formulario oficial (ModalTratamiento).
+ * 4. Filtro biológico en "Nuevo Evento Reproductivo":
+ *    - Verificación de que el selector modal excluya a los machos.
+ *    - Apertura del formulario de servicio (ModalServicio).
+ */
+
+const ANIMALES_MOCK_API = [
+  {
+    id: 'anim-1',
+    tenantId: 'tenant-test',
+    areteInterno: '#104',
+    nombre: 'Canela',
+    categoria: 'Vaca en Ordeño',
+    sexo: 'Hembra',
+    activo: true,
+    razaId: 'raza-1',
+  },
+  {
+    id: 'anim-2',
+    tenantId: 'tenant-test',
+    areteInterno: '#019',
+    nombre: 'Titán',
+    categoria: 'Semental/Reproductor',
+    sexo: 'Macho',
+    activo: true,
+    razaId: 'raza-1',
+  },
+  {
+    id: 'anim-3',
+    tenantId: 'tenant-test',
+    areteInterno: '#087',
+    nombre: 'Estrella',
+    categoria: 'Vaca en Ordeño',
+    sexo: 'Hembra',
+    activo: true,
+    razaId: 'raza-1',
+  },
+  {
+    id: 'anim-4',
+    tenantId: 'tenant-test',
+    areteInterno: '#999',
+    nombre: 'BajaTest',
+    categoria: 'Vaca Seca',
+    sexo: 'Hembra',
+    activo: false, // Inactiva
+    razaId: 'raza-1',
+  },
+];
+
+test.beforeEach(async ({ context, page }) => {
+  // Inyectar cookie de sesión de prueba para pasar el middleware de autenticación
+  await context.addCookies([
+    {
+      name: 'playwright_test_session',
+      value: 'true',
+      domain: 'localhost',
+      path: '/',
+    },
+  ]);
+
+  // Interceptar llamadas a la API de backend para que la prueba sea determinista y aislada
+  await page.route('**/animales*', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(ANIMALES_MOCK_API),
+      });
+    } else {
+      await route.continue();
+    }
+  });
+
+  await page.route('**/catalogos/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    });
+  });
+
+  await page.route('**/reproductivo/proximos-eventos*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    });
+  });
+});
+
+test.describe('Dashboard MOD-04 — Flujo principal de usuario', () => {
+  test('debe cargar el Dashboard con los 4 KPIs principales y widgets', async ({ page }) => {
+    await page.goto('/dashboard');
+
+    // Verificar encabezado principal
+    await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible();
+    await expect(page.getByText('Vistazo rápido del estado del hato y las alertas activas.')).toBeVisible();
+
+    // Verificar los 4 KPIs del diseño
+    await expect(page.getByText(/Total de hato activo/i)).toBeVisible();
+    await expect(page.getByText(/Vacas en ordeño/i)).toBeVisible();
+    await expect(page.getByText(/Gestantes confirmadas/i)).toBeVisible();
+    await expect(page.getByText('Alertas activas', { exact: true })).toBeVisible();
+
+    // Verificar secciones de Semáforo Sanitario y Calendario Reproductivo
+    await expect(page.getByText('Semáforo de Retiro Sanitario')).toBeVisible();
+    await expect(page.getByText('Calendario Reproductivo')).toBeVisible();
+
+    // Verificar sección de Acciones Rápidas
+    await expect(page.getByRole('heading', { name: 'Acciones Rápidas' })).toBeVisible();
+  });
+
+  test('debe abrir la campana de notificaciones y mostrar alertas activas', async ({ page }) => {
+    await page.goto('/dashboard');
+
+    // Botón de notificaciones
+    const botonCampana = page.getByRole('button', { name: 'Notificaciones' });
+    await expect(botonCampana).toBeVisible();
+    await botonCampana.click();
+
+    // Dropdown de alertas
+    await expect(page.getByRole('heading', { name: 'Alertas Activas' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Cerrar' })).toBeVisible();
+
+    // Cerrar el menú desplegable
+    await page.getByRole('button', { name: 'Cerrar' }).click();
+    await expect(page.getByRole('heading', { name: 'Alertas Activas' })).not.toBeVisible();
+  });
+
+  test('flujo Acciones Rápidas: Registrar Tratamiento → Buscar Animal → Abrir Formulario Modal', async ({ page }) => {
+    await page.goto('/dashboard');
+
+    // 1. Click en la tarjeta de Acción Rápida "Registrar Tratamiento Médico"
+    await page.getByRole('button', { name: /Registrar Tratamiento Médico/i }).click();
+
+    // 2. Comprobar que se abre el modal selector de animales
+    const selectorModal = page.locator('div.fixed.inset-0').filter({ hasText: /Seleccionar Animal para Tratamiento/i });
+    await expect(selectorModal).toBeVisible();
+
+    // 3. Probar la búsqueda interactiva
+    const inputBusqueda = selectorModal.getByPlaceholder('Buscar por arete, nombre o categoría...');
+    await expect(inputBusqueda).toBeVisible();
+    await inputBusqueda.fill('Canela');
+
+    // Debe mostrar a Canela dentro del selector y no a Titán
+    await expect(selectorModal.getByText('Canela')).toBeVisible();
+    await expect(selectorModal.getByText('Titán')).not.toBeVisible();
+
+    // 4. Seleccionar el animal
+    await selectorModal.getByRole('button', { name: /Seleccionar →/i }).first().click();
+
+    // 5. Debe cerrarse el selector y abrirse directamente el formulario ModalTratamiento
+    await expect(selectorModal).not.toBeVisible();
+    const modalTratamiento = page.locator('div.fixed.inset-0').filter({ hasText: /Aplicar Tratamiento Médico/i });
+    await expect(modalTratamiento.getByRole('heading', { name: 'Aplicar Tratamiento Médico' })).toBeVisible();
+    await expect(modalTratamiento.getByText(/Fármaco \*/i)).toBeVisible();
+
+    // Cerrar el modal de tratamiento
+    await modalTratamiento.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(modalTratamiento).not.toBeVisible();
+  });
+
+  test('filtro biológico: Evento Reproductivo solo permite seleccionar hembras activas', async ({ page }) => {
+    await page.goto('/dashboard');
+
+    // 1. Click en "Nuevo Evento Reproductivo"
+    await page.getByRole('button', { name: /Nuevo Evento Reproductivo/i }).click();
+
+    // 2. Verificar título del selector
+    const selectorModal = page.locator('div.fixed.inset-0').filter({ hasText: /Seleccionar Hembra para Evento Reproductivo/i });
+    await expect(selectorModal).toBeVisible();
+
+    // 3. Titán (Macho) y BajaTest (Inactiva) NUNCA deben aparecer en el selector
+    await expect(selectorModal.getByText('Titán')).not.toBeVisible();
+    await expect(selectorModal.getByText('BajaTest')).not.toBeVisible();
+
+    // Canela y Estrella (Hembras activas) sí deben aparecer
+    await expect(selectorModal.getByText('Canela')).toBeVisible();
+    await expect(selectorModal.getByText('Estrella')).toBeVisible();
+
+    // 4. Seleccionar a Canela
+    await selectorModal.getByRole('button', { name: /Seleccionar →/i }).first().click();
+
+    // 5. Debe abrirse el formulario de servicio reproductivo
+    await expect(selectorModal).not.toBeVisible();
+    const modalServicio = page.locator('div.fixed.inset-0').filter({ hasText: /Registrar Celo \/ Servicio/i });
+    await expect(modalServicio.getByRole('heading', { name: 'Registrar Celo / Servicio' })).toBeVisible();
+    await expect(modalServicio.getByText(/Tipo de Servicio/i)).toBeVisible();
+
+    // Cerrar modal
+    await modalServicio.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(modalServicio).not.toBeVisible();
+  });
+});

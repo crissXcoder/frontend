@@ -14,7 +14,7 @@ import {
   getAnimales,
 } from "@/lib/api/animales";
 
-type TipoAccionRapida = "tratamiento" | "reproductivo" | "leche";
+export type TipoAccionRapida = "tratamiento" | "reproductivo" | "leche";
 
 interface AccionConfig {
   titulo: string;
@@ -52,6 +52,39 @@ const CONFIG_ACCIONES: Record<TipoAccionRapida, AccionConfig> = {
  *    (ModalTratamiento, ModalServicio o ModalPesaje) sin tener que ir a las tablas.
  * 4. Guarda a través de la API y refresca los datos del Dashboard.
  */
+/**
+ * Filtra los animales según la acción rápida seleccionada y el texto de búsqueda.
+ *
+ * Reglas de negocio:
+ * 1. Solo animales activos (`activo: true`). Animales de baja/fallecidos nunca se listan.
+ * 2. Criterio biológico: "reproductivo" y "leche" solo admiten hembras (`sexo === 'Hembra'`).
+ * 3. Búsqueda libre insensible a mayúsculas sobre `areteInterno`, `nombre` o `categoria`.
+ */
+export function filtrarAnimalesAccion(
+  animales: Animal[],
+  accionActiva: TipoAccionRapida | null,
+  busqueda: string,
+): Animal[] {
+  if (!accionActiva) return [];
+
+  let lista = animales.filter((a) => a.activo);
+
+  // Reproductivo y Leche aplican solo a hembras
+  if (accionActiva === "reproductivo" || accionActiva === "leche") {
+    lista = lista.filter((a) => a.sexo?.toLowerCase() === "hembra");
+  }
+
+  if (!busqueda.trim()) return lista;
+
+  const term = busqueda.trim().toLowerCase();
+  return lista.filter(
+    (a) =>
+      a.areteInterno.toLowerCase().includes(term) ||
+      (a.nombre && a.nombre.toLowerCase().includes(term)) ||
+      (a.categoria && a.categoria.toLowerCase().includes(term)),
+  );
+}
+
 export function AccionesRapidas() {
   const queryClient = useQueryClient();
 
@@ -182,26 +215,10 @@ export function AccionesRapidas() {
   };
 
   // Filtrado de animales según la acción y la búsqueda del usuario
-  const animalesFiltrados = useMemo(() => {
-    if (!accionActiva) return [];
-
-    let lista = animales.filter((a) => a.activo);
-
-    // Reproductivo y Leche aplican solo a hembras
-    if (accionActiva === "reproductivo" || accionActiva === "leche") {
-      lista = lista.filter((a) => a.sexo?.toLowerCase() === "hembra");
-    }
-
-    if (!busqueda.trim()) return lista;
-
-    const term = busqueda.trim().toLowerCase();
-    return lista.filter(
-      (a) =>
-        a.areteInterno.toLowerCase().includes(term) ||
-        (a.nombre && a.nombre.toLowerCase().includes(term)) ||
-        (a.categoria && a.categoria.toLowerCase().includes(term)),
-    );
-  }, [animales, accionActiva, busqueda]);
+  const animalesFiltrados = useMemo(
+    () => filtrarAnimalesAccion(animales, accionActiva, busqueda),
+    [animales, accionActiva, busqueda],
+  );
 
   const configActual = accionActiva ? CONFIG_ACCIONES[accionActiva] : null;
 
