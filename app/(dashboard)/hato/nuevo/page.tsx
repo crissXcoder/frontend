@@ -131,7 +131,6 @@ export default function NuevoAnimalPage() {
       ...formData,
       referenciaPago: refFinal || undefined,
       fotoUrl: uploadedFotoUrl || undefined,
-      activo: true,
     };
 
     delete payload.referenciaSinpe;
@@ -334,15 +333,15 @@ export default function NuevoAnimalPage() {
                     <>
                       <option value="Ternera">Ternera</option>
                       <option value="Novilla">Novilla</option>
-                      <option value="Vaca en Ordeño">Vaca en Ordeño</option>
-                      <option value="Vaca Seca">Vaca Seca</option>
+                      <option value="Vaca">Vaca</option>
                     </>
                   )}
                   {(!formData.sexo || formData.sexo === 'Macho') && (
                     <>
-                      <option value="Torete">Torete</option>
-                      <option value="Semental/Reproductor">Semental/Reproductor</option>
-                      <option value="Novillo de Engorde">Novillo de Engorde</option>
+                      <option value="Ternero">Ternero</option>
+                      <option value="Novillo">Novillo</option>
+                      <option value="Novillo mayor">Novillo mayor</option>
+                      <option value="Toro">Toro</option>
                     </>
                   )}
                 </select>
