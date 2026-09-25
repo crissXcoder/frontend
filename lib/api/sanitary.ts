@@ -30,8 +30,10 @@ export interface TratamientoSanitario {
   diagnostico: string;
   veterinario: string | null;
   diasRetiro: number;
-  diasRetiroLeche?: number;
-  diasRetiroCarne?: number;
+  diasRetiroLeche: number;
+  diasRetiroCarne: number;
+  fechaLiberacionLeche: string | null;
+  fechaLiberacionCarne: string | null;
   documentoUrl: string | null;
   createdAt?: string;
   updatedAt?: string;
@@ -42,39 +44,129 @@ export interface CreateTratamientoDto {
   farmaco: string;
   dosis: string;
   via?: string;
-  fecha: string; // YYYY-MM-DD
+  fecha: string;
   diagnostico: string;
   veterinario?: string;
-  diasRetiro: number;
+  diasRetiro?: number;
   diasRetiroLeche?: number;
   diasRetiroCarne?: number;
   documentoUrl?: string | null;
 }
 
+export interface UpdateTratamientoDto {
+  farmaco?: string;
+  dosis?: string;
+  via?: string;
+  fecha?: string;
+  diagnostico?: string;
+  veterinario?: string;
+  diasRetiro?: number;
+  diasRetiroLeche?: number;
+  diasRetiroCarne?: number;
+  documentoUrl?: string | null;
+}
+
+export interface EstadoSanitario {
+  animalId: string;
+  enRetiro: boolean;
+  liberacionLeche: string | null;
+  liberacionCarne: string | null;
+  diasRestantesLeche: number;
+  diasRestantesCarne: number;
+  tratamientoReferencia: { id: string; farmaco: string } | null;
+}
+
+const CREATE_WHITELIST = [
+  'animalId',
+  'farmaco',
+  'dosis',
+  'via',
+  'fecha',
+  'diagnostico',
+  'veterinario',
+  'diasRetiro',
+  'diasRetiroLeche',
+  'diasRetiroCarne',
+  'documentoUrl',
+] as const;
+
 /**
- * Obtiene el catálogo oficial de medicamentos veterinarios del tenant.
+ * Mapea datos del modal (snake_case o camelCase) a un payload whitelist
+ * compatible con ValidationPipe forbidNonWhitelisted.
  */
+export function toCreateTratamientoPayload(
+  input: Record<string, unknown>,
+  animalId: string,
+): CreateTratamientoDto {
+  const lecheRaw =
+    input.diasRetiroLeche ?? input.dias_retiro_leche ?? input.diasRetiro ?? input.dias_retiro ?? 0;
+  const carneRaw =
+    input.diasRetiroCarne ?? input.dias_retiro_carne ?? input.diasRetiro ?? input.dias_retiro ?? 0;
+  const diasRetiroLeche = Number(lecheRaw) || 0;
+  const diasRetiroCarne = Number(carneRaw) || 0;
+  const diasRetiro =
+    Number(input.diasRetiro ?? input.dias_retiro) ||
+    Math.max(diasRetiroLeche, diasRetiroCarne);
+
+  const payload: CreateTratamientoDto = {
+    animalId,
+    farmaco: String(input.farmaco ?? ''),
+    dosis: String(input.dosis ?? ''),
+    fecha: String(input.fecha ?? '').slice(0, 10),
+    diagnostico: String(input.diagnostico ?? ''),
+    diasRetiro,
+    diasRetiroLeche,
+    diasRetiroCarne,
+  };
+
+  if (input.via != null && input.via !== '') payload.via = String(input.via);
+  if (input.veterinario != null && input.veterinario !== '') {
+    payload.veterinario = String(input.veterinario);
+  }
+  if (input.documentoUrl != null && input.documentoUrl !== '') {
+    payload.documentoUrl = String(input.documentoUrl);
+  }
+
+  // Garantizar que no escapen claves fuera de whitelist
+  const cleaned = {} as CreateTratamientoDto;
+  for (const key of CREATE_WHITELIST) {
+    if (key in payload && (payload as Record<string, unknown>)[key] !== undefined) {
+      (cleaned as Record<string, unknown>)[key] = (payload as Record<string, unknown>)[key];
+    }
+  }
+  return cleaned;
+}
+
+export function toUpdateTratamientoPayload(
+  input: Record<string, unknown>,
+): UpdateTratamientoDto {
+  const base = toCreateTratamientoPayload(input, '00000000-0000-0000-0000-000000000000');
+  const { animalId: _omit, ...rest } = base;
+  return rest;
+}
+
 export async function getMedicamentos(): Promise<Medicamento[]> {
   return await fetchApi('/catalogos/medicamentos');
 }
 
-/**
- * Obtiene el catálogo oficial de padecimientos/diagnósticos del tenant.
- */
 export async function getPadecimientos(): Promise<Padecimiento[]> {
   return await fetchApi('/catalogos/padecimientos');
 }
 
-/**
- * Obtiene el historial de tratamientos aplicados a un animal, ordenados descendentemente por fecha.
- */
 export async function getTratamientosByAnimal(animalId: string): Promise<TratamientoSanitario[]> {
   return await fetchApi(`/tratamientos/animal/${animalId}`);
 }
 
-/**
- * Registra un nuevo tratamiento sanitario veterinario.
- */
+export async function getEstadoSanitario(
+  animalId: string,
+  fechaReferencia?: string,
+): Promise<EstadoSanitario> {
+  const qs = fechaReferencia
+    ? `?fechaReferencia=${encodeURIComponent(fechaReferencia)}`
+    : '';
+  return await fetchApi(`/tratamientos/animal/${animalId}/estado-sanitario${qs}`);
+}
+
 export async function createTratamiento(payload: CreateTratamientoDto): Promise<TratamientoSanitario> {
   return await fetchApi('/tratamientos', {
     method: 'POST',
@@ -82,9 +174,16 @@ export async function createTratamiento(payload: CreateTratamientoDto): Promise<
   });
 }
 
-/**
- * Descompone una cadena de fecha YYYY-MM-DD en componentes numéricos independientes de zona horaria.
- */
+export async function updateTratamiento(
+  id: string,
+  payload: UpdateTratamientoDto,
+): Promise<TratamientoSanitario> {
+  return await fetchApi(`/tratamientos/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
 export function parseDateComponents(dateStr: string): { year: number; month: number; day: number } {
   const cleanStr = (dateStr || '').split('T')[0];
   const parts = cleanStr.split('-').map(Number);
@@ -95,9 +194,6 @@ export function parseDateComponents(dateStr: string): { year: number; month: num
   };
 }
 
-/**
- * Calcula la fecha proyectada de liberación sumando días calendario a la fecha base sin desfase horario.
- */
 export function calcularFechaLiberacion(fechaIso: string, dias: number): string {
   if (!fechaIso || dias == null || isNaN(dias) || dias < 0) return '';
   const { year, month, day } = parseDateComponents(fechaIso);
@@ -110,9 +206,6 @@ export function calcularFechaLiberacion(fechaIso: string, dias: number): string 
   return `${yyyy}-${mm}-${dd}`;
 }
 
-/**
- * Formatea una fecha YYYY-MM-DD en formato visible DD/MM/YYYY.
- */
 export function formatearFecha(dateStr: string): string {
   if (!dateStr) return '-';
   const clean = dateStr.split('T')[0];
@@ -122,9 +215,6 @@ export function formatearFecha(dateStr: string): string {
   return `${dd}/${mm}/${yyyy}`;
 }
 
-/**
- * Calcula los días restantes de retiro contra la fecha actual o una fecha de referencia.
- */
 export function diasRestantesRetiro(fechaLiberacionIso: string, fechaReferencia?: string): number {
   if (!fechaLiberacionIso) return 0;
   const lib = parseDateComponents(fechaLiberacionIso);

@@ -10,10 +10,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getAnimal,
   createPesaje,
-  createTratamiento,
-  updateTratamiento,
   getPesajesByAnimal,
-  getTratamientosByAnimal,
   updateAnimal,
   getDocumentos,
   createDocumento,
@@ -23,8 +20,14 @@ import {
 } from '@/lib/api/animales';
 import {
   calcularFechaLiberacion,
+  createTratamiento,
   diasRestantesRetiro,
   formatearFecha,
+  getEstadoSanitario,
+  getTratamientosByAnimal,
+  toCreateTratamientoPayload,
+  toUpdateTratamientoPayload,
+  updateTratamiento,
 } from '@/lib/api/sanitary';
 import { createClient } from '@/lib/supabase/client';
 import { BUCKET_ANIMAL_DOCS } from '@/lib/supabase/buckets';
@@ -106,6 +109,11 @@ export default function ExpedienteAnimal() {
     queryFn: () => getTratamientosByAnimal(animalId),
   });
 
+  const { data: estadoSanitario } = useQuery({
+    queryKey: ['estadoSanitario', animalId],
+    queryFn: () => getEstadoSanitario(animalId),
+  });
+
   const { data: documentosDocumentos } = useQuery({
     queryKey: ['documentos', animalId],
     queryFn: () => getDocumentos(animalId),
@@ -148,25 +156,22 @@ export default function ExpedienteAnimal() {
   });
 
   const tratamientoMutation = useMutation({
-    mutationFn: (data: any) => createTratamiento({
-      ...data,
-      diasRetiro: data.dias_retiro ? parseInt(data.dias_retiro) : 0,
-      animalId
-    }),
+    mutationFn: (data: Record<string, unknown>) =>
+      createTratamiento(toCreateTratamientoPayload(data, animalId)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tratamientos', animalId] });
+      queryClient.invalidateQueries({ queryKey: ['estadoSanitario', animalId] });
       setIsTratamientoOpen(false);
       setTratamientoSeleccionado(null);
     }
   });
 
   const updateTratamientoMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string, data: any }) => updateTratamiento(id, {
-      ...data,
-      diasRetiro: data.dias_retiro ? parseInt(data.dias_retiro) : 0,
-    }),
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
+      updateTratamiento(id, toUpdateTratamientoPayload(data)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tratamientos', animalId] });
+      queryClient.invalidateQueries({ queryKey: ['estadoSanitario', animalId] });
       setIsTratamientoOpen(false);
       setTratamientoSeleccionado(null);
     }
@@ -705,7 +710,52 @@ export default function ExpedienteAnimal() {
           )}
 
           {activeTab === 'sanitario' && (
-            <div className="bg-white border border-slate-200 rounded-xl shadow-sm mt-6 overflow-hidden">
+            <div className="space-y-6 mt-6">
+              {estadoSanitario?.enRetiro ? (
+                <div className="bg-danger-bg border border-danger/30 rounded-xl p-5 flex items-start gap-4 shadow-sm">
+                  <AlertTriangle className="w-6 h-6 text-danger shrink-0 mt-0.5" />
+                  <div className="space-y-1.5 flex-1">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <h3 className="text-sm font-extrabold text-danger tracking-wide uppercase">
+                        Retiro Sanitario Activo
+                      </h3>
+                      {estadoSanitario.tratamientoReferencia && (
+                        <span className="text-xs font-bold text-danger bg-white/70 px-2.5 py-0.5 rounded-full border border-danger/20">
+                          {estadoSanitario.tratamientoReferencia.farmaco}
+                        </span>
+                      )}
+                    </div>
+                    {estadoSanitario.liberacionLeche && estadoSanitario.diasRestantesLeche > 0 && (
+                      <p className="text-sm text-danger/90">
+                        <strong>Retiro Leche:</strong> Hasta{' '}
+                        <span className="font-bold">{formatearFecha(estadoSanitario.liberacionLeche)}</span>{' '}
+                        ({estadoSanitario.diasRestantesLeche} días restantes)
+                      </p>
+                    )}
+                    {estadoSanitario.liberacionCarne && estadoSanitario.diasRestantesCarne > 0 && (
+                      <p className="text-sm text-danger/90">
+                        <strong>Retiro Carne:</strong> Hasta{' '}
+                        <span className="font-bold">{formatearFecha(estadoSanitario.liberacionCarne)}</span>{' '}
+                        ({estadoSanitario.diasRestantesCarne} días restantes)
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : estadoSanitario ? (
+                <div className="bg-success-bg border border-success/30 rounded-xl p-5 flex items-start gap-4 shadow-sm">
+                  <CheckCircle2 className="w-6 h-6 text-success shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="text-sm font-extrabold text-success tracking-wide uppercase">
+                      Estado Sanitario: Apto
+                    </h3>
+                    <p className="text-sm text-success/90 mt-1">
+                      Sin periodos de retiro vigentes para leche ni carne.
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+
+            <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
               <div className="p-6 sm:p-8 flex items-center justify-between border-b border-slate-100 bg-surface">
                 <div>
                   <h3 className="text-lg font-bold text-navy">Historial Sanitario y Tratamientos</h3>
@@ -742,8 +792,12 @@ export default function ExpedienteAnimal() {
                     {tratamientos?.map((t: any) => {
                       const dLeche = t.diasRetiroLeche ?? t.diasRetiro ?? 0;
                       const dCarne = t.diasRetiroCarne ?? t.diasRetiro ?? 0;
-                      const libLeche = t.fecha && dLeche > 0 ? calcularFechaLiberacion(t.fecha, dLeche) : null;
-                      const libCarne = t.fecha && dCarne > 0 ? calcularFechaLiberacion(t.fecha, dCarne) : null;
+                      const libLeche =
+                        t.fechaLiberacionLeche ||
+                        (t.fecha && dLeche > 0 ? calcularFechaLiberacion(t.fecha, dLeche) : null);
+                      const libCarne =
+                        t.fechaLiberacionCarne ||
+                        (t.fecha && dCarne > 0 ? calcularFechaLiberacion(t.fecha, dCarne) : null);
                       const restLeche = libLeche ? diasRestantesRetiro(libLeche) : 0;
                       const restCarne = libCarne ? diasRestantesRetiro(libCarne) : 0;
                       const estaEnRetiro = restLeche > 0 || restCarne > 0;
@@ -839,6 +893,7 @@ export default function ExpedienteAnimal() {
                   </tbody>
                 </table>
               </div>
+            </div>
             </div>
           )}
 

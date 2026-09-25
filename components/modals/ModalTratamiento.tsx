@@ -203,15 +203,18 @@ export default function ModalTratamiento({
     const diasCarne = Number(formData.dias_retiro_carne) || 0;
     const diasMayor = Math.max(diasLeche, diasCarne);
 
+    // Solo campos camelCase whitelist — sin snake_case ni spread de formData
     onSubmit({
-      ...formData,
       farmaco: finalFarmaco,
+      dosis: formData.dosis,
+      via: formData.via,
+      fecha: formData.fecha,
       diagnostico: finalDiagnostico,
+      veterinario: formData.veterinario,
       diasRetiro: diasMayor,
       diasRetiroLeche: diasLeche,
       diasRetiroCarne: diasCarne,
-      dias_retiro: diasMayor,
-      documentoUrl: finalDocumentoUrl,
+      documentoUrl: finalDocumentoUrl || undefined,
     });
     onClose();
   };
