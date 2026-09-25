@@ -57,8 +57,13 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith('/leche') ||
     pathname.startsWith('/reportes');
 
+  // Soporte para pruebas automatizadas E2E (Playwright) en desarrollo/test
+  const isE2EBypass =
+    process.env.NODE_ENV !== 'production' &&
+    request.cookies.get('playwright_test_session')?.value === 'true';
+
   // Si intenta acceder a ruta protegida sin sesión, redirigir a /login
-  if (isProtectedRoute && !user) {
+  if (isProtectedRoute && !user && !isE2EBypass) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('redirect', pathname);

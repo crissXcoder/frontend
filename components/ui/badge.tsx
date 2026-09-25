@@ -4,11 +4,13 @@ import { cn } from "@/lib/utils"
 import { Slot } from "radix-ui"
 
 /**
- * Badge — ResDigital DESIGN.md §5.5
+ * Badge — ResDigital DESIGN.md §7
  * Variants map directly to AgTech semantic colors:
- *   success   → Emerald (Sano / Activo)
- *   warning   → Amber   (Enfermo / En tratamiento)
- *   danger    → Red     (Muerto / Vendido)
+ *   success   → Green   (Sano / Activo / bg-success-bg text-success)
+ *   warning   → Amber   (Enfermo / En tratamiento / bg-warning-bg text-warning)
+ *   danger    → Red     (Muerto / Vendido / bg-danger-bg text-danger)
+ *   info      → Blue    (Palpación / Informativo / bg-info-bg text-info)
+ *   secado    → Purple  (Secado reproductivo / bg-accent-secado-bg text-accent-secado)
  *   neutral   → Slate   (Categoría / Sexo)
  *   female    → Fuchsia (Hembras en filtros y árboles de pedigrí)
  *   male      → Blue    (Machos en filtros y árboles de pedigrí)
@@ -25,7 +27,7 @@ const badgeVariants = cva(
         secondary: "border-transparent bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90",
         /** Red: disease alerts, mortality, destructive status */
         destructive:
-          "border-transparent bg-red-100 text-red-900 focus-visible:ring-red-500/20 [a&]:hover:bg-red-200",
+          "border-transparent bg-danger-bg text-danger focus-visible:ring-red-500/20 [a&]:hover:bg-red-200",
         /** Slate outline: category / neutral */
         outline:
           "border-border bg-slate-100 text-slate-900 [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
@@ -34,13 +36,17 @@ const badgeVariants = cva(
         /** Link style */
         link: "border-transparent text-primary underline-offset-4 [a&]:hover:underline",
 
-        /* ─── AgTech Semantic ─── */
-        /** Emerald: Sano / Activo / success */
-        success: "border-transparent bg-emerald-50 text-emerald-800",
+        /* ─── AgTech Semantic (design.md §7) ─── */
+        /** Green: Sano / Activo / success */
+        success: "border-transparent bg-success-bg text-success",
         /** Amber: Pending vaccination, in heat, missing pedigree */
-        warning: "border-transparent bg-amber-50 text-amber-800",
+        warning: "border-transparent bg-warning-bg text-warning",
         /** Red: Disease alert, mortality, sold */
-        danger: "border-transparent bg-red-50 text-red-500",
+        danger: "border-transparent bg-danger-bg text-danger",
+        /** Blue: Palpación, info general */
+        info: "border-transparent bg-info-bg text-info",
+        /** Purple: Secado reproductivo */
+        secado: "border-transparent bg-accent-secado-bg text-accent-secado",
         /** Slate: Category / Sex neutral */
         neutral: "border-border bg-slate-100 text-slate-900",
 

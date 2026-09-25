@@ -1,35 +1,31 @@
 "use client";
 
+import { useState } from "react";
+import Link from "next/link";
 import { Bell } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAlertas } from "@/lib/hooks/use-dashboard-data";
-import type { CategoriaAlerta } from "@/lib/types/dashboard";
-
-const categoriaLabel: Record<CategoriaAlerta, string> = {
-  retiro: "Retiro sanitario",
-  palpacion: "Palpación",
-  parto: "Parto",
-};
 
 /**
- * Campana de notificaciones — dropdown con las alertas activas, agrupables por las
- * 3 categorías del sistema (retiro, palpación, parto). Sin duplicados: cada alerta
- * tiene un id estable derivado de categoría + animal.
+ * Campana de notificaciones — card flotante con las alertas activas del sistema.
+ * Diseño idéntico al Figma:
+ * - Header limpio con "Alertas Activas" y enlace "Cerrar"
+ * - Card blanco con esquinas redondeadas (rounded-2xl) y sombra suave
+ * - Items con indicador rojo (dot) a la izquierda y el mensaje de texto que usa el sistema
  */
 export function NotificationBell() {
+  const [open, setOpen] = useState(false);
   const { data } = useAlertas();
   const total = data?.length ?? 0;
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
@@ -48,21 +44,44 @@ export function NotificationBell() {
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80">
-        <DropdownMenuLabel className="text-slate-900">
-          Alertas activas ({total})
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
+      <DropdownMenuContent
+        align="end"
+        sideOffset={8}
+        className="w-[340px] sm:w-[380px] rounded-2xl border border-slate-100 bg-white p-5 shadow-2xl"
+      >
+        <div className="flex items-center justify-between pb-3">
+          <h3 className="text-sm font-semibold text-slate-900">Alertas Activas</h3>
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="text-xs font-medium text-slate-400 transition-colors hover:text-slate-600"
+          >
+            Cerrar
+          </button>
+        </div>
+
         {total === 0 ? (
-          <p className="px-2 py-3 text-sm text-slate-500">Sin alertas por ahora.</p>
+          <p className="py-4 text-center text-xs text-slate-400">
+            Sin alertas por el momento
+          </p>
         ) : (
-          <ul className="flex max-h-80 flex-col gap-1 overflow-y-auto px-1 py-1">
+          <ul className="flex max-h-[380px] flex-col gap-3.5 overflow-y-auto pr-1">
             {data!.map((alerta) => (
-              <li key={alerta.id} className="rounded-md px-2 py-1.5 text-sm hover:bg-blue-50">
-                <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {categoriaLabel[alerta.categoria]}
-                </span>
-                <span className="text-slate-900">{alerta.mensaje}</span>
+              <li key={alerta.id} className="flex items-start gap-2.5">
+                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-red-600" />
+                <div className="flex-1 text-[13px] leading-snug text-slate-700">
+                  {alerta.animalId ? (
+                    <Link
+                      href={`/hato/${alerta.animalId}`}
+                      onClick={() => setOpen(false)}
+                      className="transition-colors hover:text-slate-900"
+                    >
+                      {alerta.mensaje}
+                    </Link>
+                  ) : (
+                    <span>{alerta.mensaje}</span>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
